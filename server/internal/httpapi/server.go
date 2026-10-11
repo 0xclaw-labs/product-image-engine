@@ -17,6 +17,7 @@ import (
 	"github.com/bianjiefilm/product-image-engine/server/internal/buildinfo"
 	"github.com/bianjiefilm/product-image-engine/server/internal/config"
 	"github.com/bianjiefilm/product-image-engine/server/internal/imagetmpl"
+	"github.com/bianjiefilm/product-image-engine/server/internal/matrixdraftclient"
 	"github.com/bianjiefilm/product-image-engine/server/internal/platform"
 	"github.com/bianjiefilm/product-image-engine/server/internal/sizeadapt"
 	"github.com/bianjiefilm/product-image-engine/server/internal/sourceflow"
@@ -39,6 +40,9 @@ type Server struct {
 	Consume *ConsumeAdvisor
 	// Registry 应用登记表(HUI-1745 I1;nil 时回执/返回来源 fail-closed)。
 	Registry *appregistry.Manifest
+	// MatrixDrafts 是真实矩阵持久草稿服务客户端(HUI-2388 源端动作)。
+	// nil 时送矩阵端点 fail-closed 503,不伪造草稿。
+	MatrixDrafts *matrixdraftclient.Client
 	// Presets 尺寸适配预设集(HUI-1703 FEAT-0204;main 装配,内嵌默认或
 	// PRODUCT_SIZE_PRESETS 覆盖)。nil 时尺寸适配端点 fail-closed 503。
 	Presets *sizeadapt.PresetSet
@@ -117,6 +121,10 @@ func (s *Server) Router() http.Handler {
 	mux.Handle("POST /api/v1/projects/{id}/outputs", s.guard(true, s.handleRegisterOutput))
 	mux.Handle("GET /api/v1/projects/{id}/outputs", s.guard(true, s.handleListOutputs))
 	mux.Handle("POST /api/v1/projects/{id}/outputs/{outputId}/receipt", s.guard(true, s.handleSendReceipt))
+	// 选定图片进矩阵(HUI-2388 源端动作):显式 POST 创建;GET 纯回查零创建。
+	mux.Handle("POST /api/v1/projects/{id}/outputs/{outputId}/matrix-draft", s.guard(true, s.handleCreateMatrixDraft))
+	mux.Handle("GET /api/v1/projects/{id}/outputs/{outputId}/matrix-draft", s.guard(true, s.handleGetMatrixDraft))
+	mux.Handle("GET /api/v1/projects/{id}/matrix-drafts", s.guard(true, s.handleListMatrixDrafts))
 	mux.Handle("GET /api/v1/projects/{id}/campaign-restore", s.guard(true, s.handleGetCampaignRestore))
 	mux.Handle("POST /api/v1/projects/{id}/campaign-selection", s.guard(true, s.handleSelectCampaignVersion))
 	mux.Handle("GET /api/v1/projects/{id}/receipts", s.guard(true, s.handleListReceipts))

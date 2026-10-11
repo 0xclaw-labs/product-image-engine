@@ -18,6 +18,7 @@ import { RecoveryStrip } from "@/components/recovery/RecoveryStrip";
 import { MotionRefNote } from "@/components/motion-ref/MotionRefNote";
 import { RevisionRail } from "@/components/revision/RevisionRail";
 import { SourceImagePanel } from "@/components/source-image/Panel";
+import { MatrixDraftPanel } from "@/components/matrix-draft/Panel";
 
 interface Project {
   id: string;
@@ -1156,6 +1157,8 @@ export default function ProjectDetailPage() {
         </details>
         {srcNotice ? <PublicFact raw={srcNotice} /> : null}
       </div>
+
+      <MatrixDraftPanel projectId={id} outputs={outputs} />
 
       {sizePresets ? (
         <div className="card">
