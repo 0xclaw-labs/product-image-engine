@@ -207,7 +207,11 @@ func (s *Server) collectMatrixFacts(ctx context.Context, p platform.Principal, p
 					return zero, matrixFacts{}, aerr
 				}
 			}
-			facts.Revision = snapshotOrdinal(s, ctx, p.Tenant(), binding.ID, out.SnapshotID)
+			rev, rerr := snapshotOrdinal(s, ctx, p.Tenant(), binding.ID, out.SnapshotID)
+			if rerr != nil {
+				return zero, matrixFacts{}, &apiErr{http.StatusInternalServerError, "internal", "服务内部错误"}
+			}
+			facts.Revision = rev
 		}
 	} else if !errors.Is(berr, store.ErrNotFound) {
 		return zero, matrixFacts{}, &apiErr{http.StatusInternalServerError, "internal", "服务内部错误"}
@@ -232,22 +236,27 @@ func (s *Server) collectMatrixFacts(ctx context.Context, p platform.Principal, p
 }
 
 // snapshotOrdinal 需求版本序(1 起,旧→新):把输出所在的快照放到绑定快照时间线的位置。
-// 找不到(无快照上下文的旧输出)按第 1 版。
-func snapshotOrdinal(s *Server, ctx context.Context, tenant, bindingID, snapshotID string) int {
+// 无快照上下文的旧输出(snapshotID 为空/时间线为空/不在时间线上)按第 1 版;
+// 快照时间线读取失败则显式上抛——revision 是目的端幂等键成分,store 故障时
+// 不得静默降级编造送出事实(R-58 F-3)。
+func snapshotOrdinal(s *Server, ctx context.Context, tenant, bindingID, snapshotID string) (int, error) {
 	if snapshotID == "" {
-		return 1
+		return 1, nil
 	}
 	snaps, err := s.St.ListSnapshotsForBinding(ctx, tenant, bindingID)
-	if err != nil || len(snaps) == 0 {
-		return 1
+	if err != nil {
+		return 0, err
+	}
+	if len(snaps) == 0 {
+		return 1, nil
 	}
 	// 列表新→旧;位置 i(0 起)的旧序 = len-i。
 	for i, sn := range snaps {
 		if sn.ID == snapshotID {
-			return len(snaps) - i
+			return len(snaps) - i, nil
 		}
 	}
-	return 1
+	return 1, nil
 }
 
 // brandStandIn AG01 品牌注册接入前的确定性 stand-in(同一租户恒同一值,可审计可替换)。
@@ -263,7 +272,11 @@ func grantStandIn(tenant string) string {
 	return "grant-" + hex.EncodeToString(sum[:])[:12]
 }
 
-// writeMatrixDraftErr 把目的端结构化错误原样上浮(状态码+错误码不改口径)。
+// writeMatrixDraftErr 把目的端结构化错误上浮(状态码+错误码不改口径)。
+// 透传面类型化校验(R-58 F-2):目的端契约要求错误必须走 ≥400;客户端若拿到
+// 2xx/3xx 却解析不出契约 body(以 Status<400 的 APIError 表达),说明目的端违约——
+// 压成 502 显式失败,绝不把非错误状态码原样透传(HTTP 200+错误体会被 web 侧
+// res.ok 判成"草稿已落库"的假成功)。
 func writeMatrixDraftErr(w http.ResponseWriter, err error) {
 	api, ok := err.(*matrixdraftclient.APIError)
 	if !ok {
@@ -273,6 +286,11 @@ func writeMatrixDraftErr(w http.ResponseWriter, err error) {
 	if api.Status == 0 {
 		writeErr(w, http.StatusServiceUnavailable, "matrix_draft_unreachable",
 			"矩阵持久草稿服务不可达,已拒绝本次请求(不伪造草稿):"+api.Message)
+		return
+	}
+	if api.Status < 400 {
+		writeErr(w, http.StatusBadGateway, "matrix_draft_bad_response",
+			"矩阵草稿服务返回契约外响应,已按失败处理(不冒成功):"+api.Message)
 		return
 	}
 	writeErr(w, api.Status, api.Code, fmt.Sprintf("矩阵草稿服务拒绝:%s", api.Message))

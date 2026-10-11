@@ -83,12 +83,14 @@ func TestCampaignReceiptForwardLegRegisteredTarget(t *testing.T) {
 	out, _ := registered["output"].(map[string]any)
 	outID, _ := out["id"].(string)
 
-	// 未选定 → 诚实 409(面不动)。
+	// 未选定 → 诚实 409(面不动)。两个平级断言分别钉死状态码与错误码:
+	// 嵌套条件在"409+错误码错"与"非409+错误码对"两类变异下都不失败(R-58 F-1)。
 	st, denied := f.do(t, "POST", "/api/v1/projects/"+projID+"/outputs/"+outID+"/receipt", tok, nil)
 	if st != 409 {
-		if code, _ := errCodeOf(denied); code != "version_not_selected" {
-			t.Fatalf("未选定错误码: %d %v", st, denied)
-		}
+		t.Fatalf("未选定必须诚实 409: %d %v", st, denied)
+	}
+	if code, _ := errCodeOf(denied); code != "version_not_selected" {
+		t.Fatalf("未选定错误码应为 version_not_selected: %v", denied)
 	}
 	// 明确选定这一版。
 	st, _ = f.do(t, "POST", "/api/v1/projects/"+projID+"/campaign-selection", tok, map[string]any{"output_id": outID})
@@ -138,5 +140,60 @@ func TestCampaignReceiptForwardLegRegisteredTarget(t *testing.T) {
 	eco.mu.Unlock()
 	if ev["schema_version"] != "order-receipt/v1" || ev["target_app"] != "touch-engine" || ev["source_app"] != "product-image" {
 		t.Fatalf("回执帧契约: %v", ev)
+	}
+}
+
+// TestCampaignReceiptForwardUnregisteredTargetStaysHonest409 是夹具正向链路的变异臂:
+// 与 TestCampaignSelectedReceiptDeliversExactlyOnceToFixtureTarget 同链
+// (accept→登记成果→选定→回执),唯一变异是登记表保持生产形状
+// (touch-engine receipt_targets=[],即 newFixture 默认装配的正式 DefaultManifest,
+// 由 TestDefaultManifestKeepsCampaignReceiptClosed 钉死)。该链必须:
+// 409 receipt_target_unregistered + 零投递。两个平级断言钉死状态与错误码,
+// 任何把 fail-closed 面改成 2xx 假成功或换错误码的回归都会在此失败(R-58 F-1)。
+func TestCampaignReceiptForwardUnregisteredTargetStaysHonest409(t *testing.T) {
+	eco := newEcoStub(t)
+	// 故意不 attach 测试登记表:默认登记表即生产形状(活动回执关闭)。
+	f := newFixture(t, func(c *config.Config) {
+		c.UploadBaseURL = eco.srv.URL
+		c.UploadToken = "up-tok"
+		c.ReceiptKeys = "orders:" + testSecret + ";touch-engine:" + testSecret
+	})
+
+	_, pair := f.login(t, "neg@x.com", "right-pass")
+	tok, _ := pair["access_token"].(string)
+	tenant := deriveTenant("neg@x.com")
+
+	doc := handoffDoc("h-camp-neg-1", "touch-engine", "campaign", tenant, "src-camp-neg", "bind-camp-neg-1", "rev-1", "brief-1")
+	st, accepted := f.do(t, "POST", "/api/v1/handoffs/accept", tok, acceptBody(doc, "主图"))
+	if st != 200 {
+		t.Fatalf("活动接受应 200: %d %v", st, accepted)
+	}
+	proj, _ := accepted["project"].(map[string]any)
+	projID, _ := proj["id"].(string)
+
+	st, registered := f.do(t, "POST", "/api/v1/projects/"+projID+"/outputs", tok, map[string]any{
+		"file_name": "neg.png", "content_type": "image/png", "data_b64": b64(pngBytes(t, 2, 2, 7)),
+	})
+	if st != 201 {
+		t.Fatalf("登记成果应 201: %d %v", st, registered)
+	}
+	out, _ := registered["output"].(map[string]any)
+	outID, _ := out["id"].(string)
+
+	st, _ = f.do(t, "POST", "/api/v1/projects/"+projID+"/campaign-selection", tok, map[string]any{"output_id": outID})
+	if st != 201 {
+		t.Fatalf("选定应 201: %d", st)
+	}
+
+	// 未登记目标 → 必须 409 receipt_target_unregistered,且零投递。
+	st, denied := f.do(t, "POST", "/api/v1/projects/"+projID+"/outputs/"+outID+"/receipt", tok, nil)
+	if st != 409 {
+		t.Fatalf("未登记目标必须诚实 409(不得 2xx 假成功): %d %v", st, denied)
+	}
+	if code, _ := errCodeOf(denied); code != "receipt_target_unregistered" {
+		t.Fatalf("错误码应为 receipt_target_unregistered: %v", denied)
+	}
+	if eco.eventCount() != 0 {
+		t.Fatalf("拒绝路径不得产生任何投递: %d", eco.eventCount())
 	}
 }
