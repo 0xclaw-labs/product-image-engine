@@ -24,7 +24,7 @@ func honestDeclaration() Declaration {
 
 func consumerFacts() ConsumerFacts {
 	return ConsumerFacts{
-		MotionProjectID:  "mp-1", MotionRevisionID: "mpr-1",
+		MotionProjectID: "mp-1", MotionRevisionID: "mpr-1",
 		OwnerTenantID: "acct_t1", OwnerAccountID: "acct_t1",
 		OriginContextRef: OriginContextRefFor("proj_1", "mref_testdecl1"),
 		Base:             "https://goboost.example.invalid/",

@@ -168,7 +168,7 @@ func Load() Config {
 		ReceiptKeys:          os.Getenv("PRODUCT_RECEIPT_KEYS"),
 		OrderInternalToken:   os.Getenv("PRODUCT_ORDER_INTERNAL_TOKEN"),
 
-		MatrixDraftBaseURL:   os.Getenv("MATRIX_DRAFT_BASE_URL"),
+		MatrixDraftBaseURL: os.Getenv("MATRIX_DRAFT_BASE_URL"),
 
 		SizeAdaptEnabled: getBoolEnv("FEATURE_SIZE_ADAPT", false),
 		SizePresetsPath:  os.Getenv("PRODUCT_SIZE_PRESETS"),

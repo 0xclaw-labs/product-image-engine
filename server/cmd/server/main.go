@@ -21,8 +21,8 @@ import (
 	"github.com/bianjiefilm/product-image-engine/server/internal/billassemble"
 	"github.com/bianjiefilm/product-image-engine/server/internal/config"
 	"github.com/bianjiefilm/product-image-engine/server/internal/httpapi"
-	"github.com/bianjiefilm/product-image-engine/server/internal/matrixdraftclient"
 	"github.com/bianjiefilm/product-image-engine/server/internal/imagetmpl"
+	"github.com/bianjiefilm/product-image-engine/server/internal/matrixdraftclient"
 	"github.com/bianjiefilm/product-image-engine/server/internal/platform"
 	"github.com/bianjiefilm/product-image-engine/server/internal/sizeadapt"
 	"github.com/bianjiefilm/product-image-engine/server/internal/store"
@@ -80,12 +80,12 @@ func main() {
 	s := &httpapi.Server{
 		Cfg: cfg, St: st, Registry: registry, Presets: presets, TplBuiltins: tplBuiltins,
 		MatrixDrafts: matrixDrafts,
-		Ident:     &platform.IdentityClient{BaseURL: cfg.IdentityBaseURL, AppID: cfg.IdentityAppID, Token: cfg.IdentityToken},
-		Verify:    platform.NewVerifier(cfg.IdentityBaseURL, cfg.IdentityAppID, cfg.IdentityIssuer),
-		Tasks:     &platform.TaskClient{BaseURL: cfg.TaskBaseURL, AppID: cfg.IdentityAppID, Token: cfg.TaskToken},
-		Uploads:   &platform.UploadClient{BaseURL: cfg.UploadBaseURL, AppID: cfg.IdentityAppID, Token: cfg.UploadToken},
-		Billing:   &platform.BillingClient{BaseURL: cfg.BillingBaseURL, AppID: cfg.IdentityAppID, Token: cfg.BillingToken},
-		ImageHTTP: &http.Client{Timeout: 90 * time.Second},
+		Ident:        &platform.IdentityClient{BaseURL: cfg.IdentityBaseURL, AppID: cfg.IdentityAppID, Token: cfg.IdentityToken},
+		Verify:       platform.NewVerifier(cfg.IdentityBaseURL, cfg.IdentityAppID, cfg.IdentityIssuer),
+		Tasks:        &platform.TaskClient{BaseURL: cfg.TaskBaseURL, AppID: cfg.IdentityAppID, Token: cfg.TaskToken},
+		Uploads:      &platform.UploadClient{BaseURL: cfg.UploadBaseURL, AppID: cfg.IdentityAppID, Token: cfg.UploadToken},
+		Billing:      &platform.BillingClient{BaseURL: cfg.BillingBaseURL, AppID: cfg.IdentityAppID, Token: cfg.BillingToken},
+		ImageHTTP:    &http.Client{Timeout: 90 * time.Second},
 		Bills: &billassemble.Live{
 			AppID: cfg.IdentityAppID, BillingToken: cfg.BillingToken, TaskToken: cfg.TaskToken,
 			BillingBase: cfg.BillingBaseURL, TaskBase: cfg.TaskBaseURL, Enabled: cfg.BillingEnabled,
