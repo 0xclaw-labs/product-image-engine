@@ -47,7 +47,7 @@ func TestCampaignReceiptForwardLegRegisteredTarget(t *testing.T) {
 	f := newFixture(t, func(c *config.Config) {
 		c.UploadBaseURL = eco.srv.URL
 		c.UploadToken = "up-tok"
-		c.ReceiptKeys = "orders:" + testSecret + ",touch-engine:" + testSecret
+		c.ReceiptKeys = "orders:" + testSecret + ";touch-engine:" + testSecret
 	})
 	// R14b:scratchpad 测试登记表给 touch-engine 注册 receipt target。
 	attachRegistry(t, f, mustTouchRegistry(t, eco.srv.URL+"/internal/v1/handoff/receipts"))
