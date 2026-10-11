@@ -39,3 +39,17 @@ export function draftHonestLabel(draft: MatrixDraft): string {
 export function matrixLicenseRequired(licenseRef: string | null | undefined): boolean {
   return licenseRef == null || licenseRef.trim() === "";
 }
+
+// parseLicenseExpiry 把 license 到期输入(datetime-local 或含时区的 RFC3339 串)
+// 解析成 ISO(UTC)。空串是可选项 → 返回 ""(不带该字段);
+// 无法解析 → 返回 null(调用方如实提示,绝不发起送矩阵,不抛未处理异常)。
+// new Date(...).toISOString() 对 Invalid Date 会 throw RangeError,这里就地接住。
+export function parseLicenseExpiry(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  try {
+    return new Date(trimmed).toISOString();
+  } catch {
+    return null;
+  }
+}

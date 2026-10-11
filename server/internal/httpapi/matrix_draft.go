@@ -68,12 +68,16 @@ func (s *Server) handleCreateMatrixDraft(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	// 许可随版本保持:同 output 已登记且 license 事实不一致 → 拒绝(先于目的端)。
+	// license_expires_at 按 RFC3339 时刻比较(同一时刻不同写法 +08:00 vs Z 不算
+	// 改写);落账沿用已登记原串,保留首次请求写法(原串存储)。
+	putLicRef, putLicExp := req.LicenseRef, req.LicenseExpiresAt
 	if existing, err := s.St.GetMatrixDraftRef(ctx, p.Tenant(), projID, outputID); err == nil {
-		if existing.LicenseRef != req.LicenseRef || existing.LicenseExpiresAt != req.LicenseExpiresAt {
+		if existing.LicenseRef != req.LicenseRef || !licenseExpiresEqual(existing.LicenseExpiresAt, req.LicenseExpiresAt) {
 			writeErr(w, http.StatusConflict, "matrix_draft_facts_conflict",
 				"该输出版本已按其他许可事实送过矩阵;许可随版本保持,不得改写(如需新许可请新版本新输出)")
 			return
 		}
+		putLicRef, putLicExp = existing.LicenseRef, existing.LicenseExpiresAt
 	} else if !errors.Is(err, store.ErrNotFound) {
 		writeStoreErr(w, err)
 		return
@@ -93,7 +97,7 @@ func (s *Server) handleCreateMatrixDraft(w http.ResponseWriter, r *http.Request)
 	factsJSON, _ := json.Marshal(in)
 	ref, _, err := s.St.PutMatrixDraftRef(ctx, store.MatrixDraftRef{
 		TenantScope: p.Tenant(), ProjectID: projID, OutputID: outputID, DraftID: draft.ID,
-		LicenseRef: req.LicenseRef, LicenseExpiresAt: req.LicenseExpiresAt,
+		LicenseRef: putLicRef, LicenseExpiresAt: putLicExp,
 		QualityVerdict: facts.QualityVerdict, BriefVersion: out.BriefVersion,
 		SourceRevision: out.SourceRevision, AssetSHA256: out.ResultSHA256,
 		FactsJSON: string(factsJSON),
@@ -233,6 +237,21 @@ func (s *Server) collectMatrixFacts(ctx context.Context, p platform.Principal, p
 	facts.BrandID = brandStandIn(p.Tenant())
 	facts.PayerID = p.AccountID
 	return out, facts, nil
+}
+
+// licenseExpiresEqual 比较许可到期时刻:两端都按 RFC3339 解析成 UTC 后比时刻
+// (同一时刻的不同写法,如 +08:00 vs Z,不算许可事实不一致);任一端解析失败
+// 回退原串比较。存储仍保留各自请求原串,不做改写。
+func licenseExpiresEqual(stored, incoming string) bool {
+	if stored == incoming {
+		return true
+	}
+	st, serr := time.Parse(time.RFC3339, stored)
+	it, ierr := time.Parse(time.RFC3339, incoming)
+	if serr != nil || ierr != nil {
+		return false
+	}
+	return st.Equal(it)
 }
 
 // snapshotOrdinal 需求版本序(1 起,旧→新):把输出所在的快照放到绑定快照时间线的位置。
