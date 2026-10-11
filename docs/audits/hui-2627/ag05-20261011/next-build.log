@@ -1,0 +1,117 @@
+ ⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
+ We detected multiple lockfiles and selected the directory of /Volumes/MobileHD/Work/派诺生态/package-lock.json as the root directory.
+ To silence this warning, set `outputFileTracingRoot` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+   See https://nextjs.org/docs/app/api-reference/config/next-config-js/output#caveats for more information.
+ Detected additional lockfiles: 
+   * /Volumes/MobileHD/Work/派诺生态/_worktrees/20261011-ag05-pie-integrator/web/package-lock.json
+
+   ▲ Next.js 15.5.25
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 25.2s
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/32) ...
+   Generating static pages (8/32) 
+   Generating static pages (16/32) 
+   Generating static pages (24/32) 
+ ✓ Generating static pages (32/32)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                                         Size  First Load JS
+┌ ƒ /                                                              321 B         103 kB
+├ ○ /_not-found                                                    996 B         104 kB
+├ ƒ /api/auth/login                                                321 B         103 kB
+├ ƒ /api/auth/logout                                               321 B         103 kB
+├ ƒ /api/auth/refresh                                              321 B         103 kB
+├ ƒ /api/auth/session                                              321 B         103 kB
+├ ƒ /api/background-replacements/acceptance                        321 B         103 kB
+├ ƒ /api/background-replacements/capabilities                      321 B         103 kB
+├ ƒ /api/batches                                                   321 B         103 kB
+├ ƒ /api/batches/[id]                                              321 B         103 kB
+├ ƒ /api/batches/[id]/cancel                                       321 B         103 kB
+├ ƒ /api/batches/[id]/collect                                      321 B         103 kB
+├ ƒ /api/batches/[id]/retry-failed                                 321 B         103 kB
+├ ƒ /api/batches/[id]/submit                                       321 B         103 kB
+├ ƒ /api/billing/balance                                           321 B         103 kB
+├ ƒ /api/billing/consume/confirm                                   321 B         103 kB
+├ ƒ /api/billing/consume/quote                                     321 B         103 kB
+├ ƒ /api/billing/consume/recover                                   321 B         103 kB
+├ ƒ /api/billing/consume/return                                    321 B         103 kB
+├ ƒ /api/bindings                                                  321 B         103 kB
+├ ƒ /api/bindings/[id]                                             321 B         103 kB
+├ ƒ /api/bindings/[id]/adopt                                       321 B         103 kB
+├ ƒ /api/bindings/[id]/return-target                               321 B         103 kB
+├ ƒ /api/entry/personal                                            321 B         103 kB
+├ ƒ /api/entry/source                                              321 B         103 kB
+├ ƒ /api/entry/start                                               321 B         103 kB
+├ ƒ /api/handoffs/accept                                           321 B         103 kB
+├ ƒ /api/light-scenes/acceptance                                   321 B         103 kB
+├ ƒ /api/light-scenes/capabilities                                 321 B         103 kB
+├ ƒ /api/photos                                                    321 B         103 kB
+├ ƒ /api/photos/[id]/content                                       321 B         103 kB
+├ ƒ /api/projects                                                  321 B         103 kB
+├ ƒ /api/projects/[id]                                             321 B         103 kB
+├ ƒ /api/projects/[id]/background-replacements                     321 B         103 kB
+├ ƒ /api/projects/[id]/background-replacements/[jobId]/[action]    321 B         103 kB
+├ ƒ /api/projects/[id]/background-replacements/[jobId]/content     321 B         103 kB
+├ ƒ /api/projects/[id]/fidelity-reports                            321 B         103 kB
+├ ƒ /api/projects/[id]/first-image                                 321 B         103 kB
+├ ƒ /api/projects/[id]/first-image/refresh                         321 B         103 kB
+├ ƒ /api/projects/[id]/inputs                                      321 B         103 kB
+├ ƒ /api/projects/[id]/inputs/[inputId]                            321 B         103 kB
+├ ƒ /api/projects/[id]/inputs/[inputId]/content                    321 B         103 kB
+├ ƒ /api/projects/[id]/light-scenes                                321 B         103 kB
+├ ƒ /api/projects/[id]/light-scenes/[jobId]/[action]               321 B         103 kB
+├ ƒ /api/projects/[id]/motion-refs                                 321 B         103 kB
+├ ƒ /api/projects/[id]/motion-refs/[refId]/parameters              321 B         103 kB
+├ ƒ /api/projects/[id]/motion-refs/batch-rerun                     321 B         103 kB
+├ ƒ /api/projects/[id]/outputs                                     321 B         103 kB
+├ ƒ /api/projects/[id]/outputs/[outputId]/receipt                  321 B         103 kB
+├ ƒ /api/projects/[id]/receipts                                    321 B         103 kB
+├ ƒ /api/projects/[id]/revisions                                   321 B         103 kB
+├ ƒ /api/projects/[id]/revisions/[label]/adopt                     321 B         103 kB
+├ ƒ /api/projects/[id]/revisions/[label]/content                   321 B         103 kB
+├ ƒ /api/projects/[id]/revisions/[label]/downstream                321 B         103 kB
+├ ƒ /api/projects/[id]/revisions/[label]/export                    321 B         103 kB
+├ ƒ /api/projects/[id]/revisions/briefs                            321 B         103 kB
+├ ƒ /api/projects/[id]/revisions/compare                           321 B         103 kB
+├ ƒ /api/projects/[id]/revisions/intent                            321 B         103 kB
+├ ƒ /api/projects/[id]/revisions/outcome                           321 B         103 kB
+├ ƒ /api/projects/[id]/revisions/plan                              321 B         103 kB
+├ ƒ /api/projects/[id]/revisions/rollback                          321 B         103 kB
+├ ƒ /api/projects/[id]/showcase-videos                             321 B         103 kB
+├ ƒ /api/projects/[id]/showcase-videos/[jobId]/[action]            321 B         103 kB
+├ ƒ /api/projects/[id]/size-adapt                                  321 B         103 kB
+├ ƒ /api/projects/[id]/size-adapt/[variantId]/download             321 B         103 kB
+├ ƒ /api/projects/[id]/source-image-capabilities                   321 B         103 kB
+├ ƒ /api/projects/[id]/source-image-runs                           321 B         103 kB
+├ ƒ /api/projects/[id]/source-image-runs/[runId]                   321 B         103 kB
+├ ƒ /api/projects/[id]/source-image-runs/[runId]/[action]          321 B         103 kB
+├ ƒ /api/projects/[id]/source-image-runs/by-request                321 B         103 kB
+├ ƒ /api/projects/[id]/text-images                                 321 B         103 kB
+├ ƒ /api/projects/[id]/text-images/[jobId]                         321 B         103 kB
+├ ƒ /api/projects/[id]/text-images/[jobId]/[action]                321 B         103 kB
+├ ƒ /api/projects/[id]/text-images/[jobId]/download                321 B         103 kB
+├ ƒ /api/projects/[id]/versions                                    321 B         103 kB
+├ ƒ /api/receipts/[id]/resend                                      321 B         103 kB
+├ ƒ /api/showcase-videos/capabilities                              321 B         103 kB
+├ ƒ /api/size-adapt/presets                                        321 B         103 kB
+├ ƒ /api/text-images/capabilities                                  321 B         103 kB
+├ ○ /batches                                                     3.69 kB         110 kB
+├ ○ /handoff                                                     2.92 kB         109 kB
+├ ○ /login                                                       2.68 kB         105 kB
+├ ○ /projects                                                    3.21 kB         109 kB
+├ ƒ /projects/[id]                                               17.8 kB         150 kB
+└ ○ /start                                                       5.82 kB         138 kB
++ First Load JS shared by all                                     103 kB
+  ├ chunks/1255-7316b50163a428e6.js                              46.4 kB
+  ├ chunks/4bd1b696-f785427dddbba9fb.js                          54.2 kB
+  └ other shared chunks (total)                                  1.94 kB
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+BUILD_EXIT=0

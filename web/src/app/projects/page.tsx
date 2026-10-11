@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { jsonBody, jsonHeaders } from "@/lib/api-client";
 import { projectSourceLabel, projectStatusLabel } from "@/lib/project-labels";
@@ -106,16 +107,16 @@ export default function ProjectsPage() {
           <Link className="link" href="/handoff">
             接受跨应用交接
           </Link>
-          <button className="primary" onClick={() => setShowCreate((v) => !v)}>
+          <Button className="primary" onClick={() => setShowCreate((v) => !v)}>
             {showCreate ? "收起" : "新建工程"}
-          </button>
+          </Button>
         </div>
         {showCreate ? (
           <form onSubmit={create} className="mt-12">
             <div className="media-actions">
-              <button className="primary" type="submit" disabled={creating}>
+              <Button className="primary" type="submit" disabled={creating}>
                 {creating ? "创建中…" : "创建"}
-              </button>
+              </Button>
             </div>
             <div className="row">
               <div>
