@@ -25,6 +25,19 @@ func TestSourceDecodeSingleMeaning(t *testing.T) {
 		t.Fatal(dst, err)
 	}
 }
+func TestSourceUsageAcceptsPublicationRefStillRejectsUnknownKeys(t *testing.T) {
+	r := sourceWireRun()
+	// HUI-3159 stamps publication_ref on platform usage facts; the decoder
+	// must accept it (informational) while staying closed to everything else.
+	withRef := strings.Replace(string(sourceBillJSON(r)), `"status":"quoted"`, `"status":"quoted","publication_ref":"pub-hui3159-1"`, 1)
+	if _, e := decodeSourceBill([]byte(withRef), r); e != nil {
+		t.Fatal("publication_ref must decode as accepted informational field", e)
+	}
+	unknown := strings.Replace(string(sourceBillJSON(r)), `"status":"quoted"`, `"status":"quoted","mystery_stamp":1`, 1)
+	if _, e := decodeSourceBill([]byte(unknown), r); !errors.Is(e, si.ErrInvariant) {
+		t.Fatal("unknown key must still be rejected", e)
+	}
+}
 func TestSourceDecodeRejectsMalformedKnownFieldTypes(t *testing.T) {
 	r := sourceWireRun()
 	for _, pair := range [][2]string{{`"hold_id":""`, `"hold_id":{}`}, {`"created_at_unix":`, `"created_at_unix":null,"ignored":`}, {`"quoted_unit_price_minor":25`, `"quoted_unit_price_minor":null`}} {
