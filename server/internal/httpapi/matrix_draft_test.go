@@ -16,12 +16,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/bianjiefilm/product-image-engine/server/internal/config"
 	"github.com/bianjiefilm/product-image-engine/server/internal/matrixdraftclient"
+	"github.com/bianjiefilm/product-image-engine/server/internal/store"
 )
 
 // countingStub 记录每一次请求;creates 里的任何条目都是测试失败证据。
@@ -190,6 +192,68 @@ func TestMatrixDraftMissingLicenseRefRejected(t *testing.T) {
 	}
 	if stub.creates != 0 {
 		t.Fatalf("缺 license_ref 不得触达目的端: %d", stub.creates)
+	}
+}
+
+// TestMatrixDraftDestination2xxContractViolationFailsExplicitly 钉死透传面类型化校验:
+// 目的端返回 2xx 但 body 非契约(matrixdraftclient 产出 Status<400 的 APIError)时,
+// BFF 必须显式 502 matrix_draft_bad_response——不得把非错误状态码原样透传,
+// 否则 HTTP 200+错误体会被 web 侧 res.ok 判成"草稿已在矩阵服务落库"的假成功(R-58 F-2)。
+func TestMatrixDraftDestination2xxContractViolationFailsExplicitly(t *testing.T) {
+	eco := newEcoStub(t)
+	f := newFixture(t, func(c *config.Config) {
+		c.UploadBaseURL = eco.srv.URL
+		c.UploadToken = "up-tok"
+	})
+	attachRegistry(t, f, mustRegistry(t, eco.srv.URL+"/internal/v1/handoff/receipts"))
+	projID, outID, tok, _ := campaignProjectWithOutput(t, f, "md-2xx@x.com", "h-md-2xx-1")
+	_, _ = f.do(t, "POST", "/api/v1/projects/"+projID+"/campaign-selection", tok, map[string]any{"output_id": outID})
+
+	// 违约桩:200 + 契约外 body(无 draft_id/schema_version,解析不出 Draft)。
+	hits := 0
+	bad := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits++
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"unexpected":"shape"}`))
+	}))
+	defer bad.Close()
+	f.srv.MatrixDrafts = &matrixdraftclient.Client{BaseURL: bad.URL}
+	f.rearm(t)
+
+	st, body := f.do(t, "POST", "/api/v1/projects/"+projID+"/outputs/"+outID+"/matrix-draft", tok,
+		map[string]any{"license_ref": "lic-1"})
+	if st != 502 {
+		t.Fatalf("目的端 2xx 契约外响应必须显式失败 502(不得透传 200 冒成功): %d %v", st, body)
+	}
+	if code, _ := errCodeOf(body); code != "matrix_draft_bad_response" {
+		t.Fatalf("错误码应为 matrix_draft_bad_response: %v", body)
+	}
+	if hits != 1 {
+		t.Fatalf("502 必须来自目的端违约透传面(应恰好触达一次): %d", hits)
+	}
+	// 不冒成功也不落账:失败路径不得写本端 ref,回查诚实 404。
+	st, none := f.do(t, "GET", "/api/v1/projects/"+projID+"/outputs/"+outID+"/matrix-draft", tok, nil)
+	if st != 404 {
+		t.Fatalf("失败路径不得登记 ref: %d %v", st, none)
+	}
+	if code, _ := errCodeOf(none); code != "no_matrix_draft" {
+		t.Fatalf("错误码应为 no_matrix_draft: %v", none)
+	}
+}
+
+// TestMatrixDraftRevisionRefusesToSwallowStoreErrors 钉死 revision 事实链:
+// revision 是目的端幂等键的成分;快照时间线读取失败必须显式上抛给调用方,
+// 不得静默降级为 revision=1 编造送出事实(R-58 F-3)。
+func TestMatrixDraftRevisionRefusesToSwallowStoreErrors(t *testing.T) {
+	st, err := store.Open(filepath.Join(t.TempDir(), "rev.db"))
+	if err != nil {
+		t.Fatalf("打开临时库: %v", err)
+	}
+	st.Close() // 注入 store 瞬时故障:此后任何读取都失败
+	s := &Server{St: st}
+	rev, rerr := snapshotOrdinal(s, context.Background(), "tenant-x", "bind-x", "snap-x")
+	if rerr == nil {
+		t.Fatalf("store 错误必须上抛,不得静默降级: revision=%d", rev)
 	}
 }
 
