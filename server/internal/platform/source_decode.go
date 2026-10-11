@@ -193,7 +193,12 @@ func sourceBool(m map[string]json.RawMessage, k string) (bool, error) {
 }
 func sourcePresent(raw json.RawMessage) bool { return len(raw) > 0 && string(raw) != "null" }
 func sourceUsage(raw []byte, r si.Run) (si.BillFact, error) {
-	m, e := sourceObject(raw, "funding_version payer_user_id idempotency_key quote_id quoted_unit_price_minor quoted_at_unix quote_expires_at_unix usage_id app_id capability quantity pricing_version business_ref payer_account_id quoted_amount_minor hold_id status created_at_unix updated_at_unix", "")
+	// publication_ref (HUI-3159) is informational provenance the platform
+	// stamps on newer usage facts; the product does not act on it. It rides
+	// in the OPTIONAL set: facts without it (older platforms) and facts with
+	// it both decode, while every checked field stays required and unknown
+	// keys still fail closed.
+	m, e := sourceObject(raw, "funding_version payer_user_id idempotency_key quote_id quoted_unit_price_minor quoted_at_unix quote_expires_at_unix usage_id app_id capability quantity pricing_version business_ref payer_account_id quoted_amount_minor hold_id status created_at_unix updated_at_unix", "publication_ref")
 	if e != nil {
 		return si.BillFact{}, e
 	}
