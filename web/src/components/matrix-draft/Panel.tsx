@@ -10,6 +10,7 @@ import {
   MatrixDraftFacts,
   draftHonestLabel,
   matrixLicenseRequired,
+  parseLicenseExpiry,
 } from "@/lib/matrix-draft";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,6 +57,12 @@ export function MatrixDraftPanel({
       setNotice("license_ref 必填(目的端破坏性必填,不代填)");
       return;
     }
+    // 到期时间先就地解析:非法输入如实提示,不发请求、不抛未处理异常。
+    const expiresIso = parseLicenseExpiry(licenseExpiresAt);
+    if (expiresIso === null) {
+      setNotice("license 到期时间无法解析,请用日期选择器重新选择(未发起送矩阵)");
+      return;
+    }
     setBusy(true);
     setNotice("");
     try {
@@ -66,9 +73,7 @@ export function MatrixDraftPanel({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             license_ref: licenseRef.trim(),
-            ...(licenseExpiresAt.trim()
-              ? { license_expires_at: new Date(licenseExpiresAt.trim()).toISOString() }
-              : {}),
+            ...(expiresIso ? { license_expires_at: expiresIso } : {}),
           }),
         }
       );
