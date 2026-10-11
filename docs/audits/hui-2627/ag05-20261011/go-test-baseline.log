@@ -1,0 +1,36 @@
+?   	github.com/bianjiefilm/product-image-engine/server/cmd/samplegen	[no test files]
+ok  	github.com/bianjiefilm/product-image-engine/server/cmd/server	18.954s
+ok  	github.com/bianjiefilm/product-image-engine/server/internal/appregistry	6.626s
+ok  	github.com/bianjiefilm/product-image-engine/server/internal/bgreplace	8.240s
+ok  	github.com/bianjiefilm/product-image-engine/server/internal/billassemble	8.895s
+ok  	github.com/bianjiefilm/product-image-engine/server/internal/billconsume	9.615s
+ok  	github.com/bianjiefilm/product-image-engine/server/internal/buildinfo	10.283s
+ok  	github.com/bianjiefilm/product-image-engine/server/internal/config	12.241s
+ok  	github.com/bianjiefilm/product-image-engine/server/internal/engwalk	11.514s
+ok  	github.com/bianjiefilm/product-image-engine/server/internal/entry	12.655s
+ok  	github.com/bianjiefilm/product-image-engine/server/internal/fidelity	9.147s
+ok  	github.com/bianjiefilm/product-image-engine/server/internal/fidelitysamples	39.206s
+?   	github.com/bianjiefilm/product-image-engine/server/internal/fidelitysamples/sampletest	[no test files]
+ok  	github.com/bianjiefilm/product-image-engine/server/internal/handoff	8.437s
+ok  	github.com/bianjiefilm/product-image-engine/server/internal/httpapi	66.527s
+ok  	github.com/bianjiefilm/product-image-engine/server/internal/imagemodel	12.812s
+ok  	github.com/bianjiefilm/product-image-engine/server/internal/imagetmpl	13.323s
+ok  	github.com/bianjiefilm/product-image-engine/server/internal/imgprobe	14.873s
+ok  	github.com/bianjiefilm/product-image-engine/server/internal/lightscene	14.895s
+ok  	github.com/bianjiefilm/product-image-engine/server/internal/matrixhandoff	14.838s
+ok  	github.com/bianjiefilm/product-image-engine/server/internal/motionref	16.671s
+ok  	github.com/bianjiefilm/product-image-engine/server/internal/platelock	73.858s
+ok  	github.com/bianjiefilm/product-image-engine/server/internal/platform	24.661s
+ok  	github.com/bianjiefilm/product-image-engine/server/internal/publicconsumer	18.156s
+ok  	github.com/bianjiefilm/product-image-engine/server/internal/qualitygate	19.201s
+ok  	github.com/bianjiefilm/product-image-engine/server/internal/receiptdoc	19.152s
+ok  	github.com/bianjiefilm/product-image-engine/server/internal/revision	19.444s
+ok  	github.com/bianjiefilm/product-image-engine/server/internal/samplegen	32.447s
+ok  	github.com/bianjiefilm/product-image-engine/server/internal/showcasevideo	19.393s
+ok  	github.com/bianjiefilm/product-image-engine/server/internal/sizeadapt	27.645s
+ok  	github.com/bianjiefilm/product-image-engine/server/internal/sourceflow	57.556s
+ok  	github.com/bianjiefilm/product-image-engine/server/internal/sourceimage	27.936s
+ok  	github.com/bianjiefilm/product-image-engine/server/internal/store	39.955s
+ok  	github.com/bianjiefilm/product-image-engine/server/internal/textimage	28.340s
+ok  	github.com/bianjiefilm/product-image-engine/server/internal/videofixture	29.147s
+GO_TEST_EXIT=0

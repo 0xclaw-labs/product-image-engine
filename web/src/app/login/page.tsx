@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import { jsonBody, jsonHeaders } from "@/lib/api-client";
 import { loggedInHome } from "@/lib/first-image";
 
@@ -51,13 +52,13 @@ export default function LoginPage() {
           <h2>登录</h2>
           <form onSubmit={submit}>
             <div className="media-actions">
-              <button className="primary" type="submit" disabled={busy}>
+              <Button className="primary" type="submit" disabled={busy}>
                 {busy ? (
                   <span data-state="loading">登录中…</span>
                 ) : (
                   "登录后开始"
                 )}
-              </button>
+              </Button>
             </div>
             <label htmlFor="login-email">邮箱</label>
             <input

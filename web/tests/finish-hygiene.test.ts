@@ -32,7 +32,7 @@ const RULES = {
 const BASELINE: Record<keyof typeof RULES, number> = {
   bare_hex: 0,
   inline_style: 34,
-  raw_button: 45,
+  raw_button: 42,
   raw_input: 53,
   raw_table: 14,
 };

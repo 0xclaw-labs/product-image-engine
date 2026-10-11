@@ -79,9 +79,9 @@ const markerBook: readonly { route: string; markers: readonly Marker[] }[] = [
   // HUI-2627 fix2:/login、/projects、/projects/[id] 的行内样式已全部收敛为
   // globals.css 版式工具类(2026-10-08,gate-r2 修复轮),标记账随真实页面收缩;
   // raw 控件维持既有记账水平(见 docs/audits/hui-2627/fix2/hygiene-scan.json)。
-  { route: "/login", markers: ["raw button", "raw input"] },
+  { route: "/login", markers: ["raw input"] },
   { route: "/start", markers: [] },
-  { route: "/projects", markers: ["raw button", "raw input", "raw table"] },
+  { route: "/projects", markers: ["raw input", "raw table"] },
   { route: "/projects/[id]", markers: ["raw button", "raw input", "raw table"] },
   { route: "/batches", markers: ["inline style", "raw button", "raw input", "raw table"] },
   { route: "/handoff", markers: ["inline style", "raw button", "raw input", "raw table"] },
