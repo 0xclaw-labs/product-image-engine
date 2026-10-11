@@ -58,7 +58,8 @@ describe("矩阵草稿 BFF", () => {
     const body = await res.json();
     expect(body.matrix_draft.published).toBe(false);
     expect(fetchSpy).toHaveBeenCalledTimes(1);
-    expect((fetchSpy.mock.calls[0] as unknown[])[1]?.method).toBe("GET");
+    const [, init] = fetchSpy.mock.calls[0] as unknown as [string, RequestInit | undefined];
+    expect(init?.method).toBe("GET");
   });
 
   it("POST 送矩阵透传(含 license 事实)", async () => {
