@@ -29,6 +29,26 @@ export function MatrixDraftPanel({
   const [draft, setDraft] = useState<MatrixDraft | null>(null);
   const [facts, setFacts] = useState<MatrixDraftFacts | null>(null);
   const [receipt, setReceipt] = useState<MatrixDraft | null>(null);
+  const [selectNotice, setSelectNotice] = useState("");
+
+  // 明确选定此版(活动来源):选定前送矩阵会被诚实拒绝(version_not_selected)。
+  async function selectThisVersion() {
+    if (!outputId) return;
+    setSelectNotice("");
+    const res = await fetch(`/api/projects/${projectId}/campaign-selection`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ output_id: outputId }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      setSelectNotice(data?.error?.message ?? `选定失败(HTTP ${res.status})`);
+      return;
+    }
+    setSelectNotice(
+      data?.duplicate ? "此版已是选定版本(幂等)" : "已明确选定此版本"
+    );
+  }
 
   async function sendToMatrix() {
     if (!outputId) return;
@@ -138,9 +158,17 @@ export function MatrixDraftPanel({
         </div>
       </div>
       <div className="media-actions">
+        <Button variant="secondary" onClick={selectThisVersion} disabled={busy}>
+          选定此版(活动)
+        </Button>
         <Button onClick={sendToMatrix} disabled={busy}>送矩阵(创建草稿)</Button>
         <Button variant="outline" onClick={readBack} disabled={busy}>矩阵回查(只读)</Button>
       </div>
+      {selectNotice ? (
+        <p role="status" className="muted" data-testid="matrix-select-notice">
+          {selectNotice}
+        </p>
+      ) : null}
       {notice ? (
         <p role="status" className="muted" data-testid="matrix-draft-notice">
           {notice}

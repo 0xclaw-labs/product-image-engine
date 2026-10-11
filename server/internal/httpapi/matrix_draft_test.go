@@ -204,13 +204,18 @@ func TestMatrixDraftLiveRealService(t *testing.T) {
 		c.UploadToken = "up-tok"
 	})
 	attachRegistry(t, f, mustRegistry(t, eco.srv.URL+"/internal/v1/handoff/receipts"))
-	projID, outID, tok, tenant := campaignProjectWithOutput(t, f, "md-live@x.com", "h-md-live-1")
+	// 目的端 sqlite 跨运行持久:fingerprint 一次写死,故每次运行用新的来源键,
+	// 既证明创建,也在同一次运行内证明同键同事实重放;重跑不与历史行冲突。
+	runSuffix := fmt.Sprintf("%d", time.Now().UnixNano())
+	handoff1 := "h-md-live-1-" + runSuffix
+	projID, outID, tok, tenant := campaignProjectWithOutput(t, f, "md-live@x.com", handoff1)
 	_, _ = f.do(t, "POST", "/api/v1/projects/"+projID+"/campaign-selection", tok, map[string]any{"output_id": outID})
 
 	f.srv.MatrixDrafts = &matrixdraftclient.Client{BaseURL: base}
 	f.rearm(t)
 
-	future := time.Now().UTC().Add(24 * time.Hour).Format(time.RFC3339)
+	// 许可有效期用固定远期时刻:live 重跑时同键同事实(目的端幂等重放),不因 now 漂移变成异参冲突。
+	future := time.Date(2030, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339)
 	st, created := f.do(t, "POST", "/api/v1/projects/"+projID+"/outputs/"+outID+"/matrix-draft", tok,
 		map[string]any{"license_ref": "lic-live-1", "license_expires_at": future})
 	if st != 201 {
@@ -229,7 +234,7 @@ func TestMatrixDraftLiveRealService(t *testing.T) {
 	}
 	// 事实保留:回查响应里的 source_facts 与服务端一致。
 	sf, _ := created["source_facts"].(map[string]any)
-	if sf["source_project_id"] != "src-h-md-live-1" || sf["quality_verdict"] != "unknown" {
+	if sf["source_project_id"] != "src-"+handoff1 || sf["quality_verdict"] != "unknown" {
 		t.Fatalf("source_facts: %v", sf)
 	}
 	// 同键同事实 → 幂等重放同草稿。
@@ -245,7 +250,7 @@ func TestMatrixDraftLiveRealService(t *testing.T) {
 	// 同键异事实在目的端也是 409(用另一输出同 source 键直接验证目的端契约)。
 	client := &matrixdraftclient.Client{BaseURL: base}
 	_, cErr := client.Create(context.Background(), matrixdraftclient.Input{
-		SourceProjectID: "src-h-md-live-1", CampaignID: "camp-2026-091", Revision: 1,
+		SourceProjectID: "src-" + handoff1, CampaignID: "camp-2026-091", Revision: 1,
 		AssetID: draft["asset_id"].(string), AssetHash: draft["asset_hash"].(string),
 		GrantRef: fmt.Sprintf("%v", sf["grant_ref"]), TenantID: tenant,
 		BrandID: fmt.Sprintf("%v", sf["brand_id"]), PayerID: tenant,
@@ -270,7 +275,7 @@ func TestMatrixDraftLiveRealService(t *testing.T) {
 	}
 	// 许可过期 → 目的端 403 license_expired(经 BFF 原样上浮)。
 	past := time.Now().UTC().Add(-time.Hour).Format(time.RFC3339)
-	projID2, outID2, tok2, _ := campaignProjectWithOutput(t, f, "md-live2@x.com", "h-md-live-2")
+	projID2, outID2, tok2, _ := campaignProjectWithOutput(t, f, "md-live2@x.com", "h-md-live-2-"+runSuffix)
 	_, _ = f.do(t, "POST", "/api/v1/projects/"+projID2+"/campaign-selection", tok2, map[string]any{"output_id": outID2})
 	st, expired := f.do(t, "POST", "/api/v1/projects/"+projID2+"/outputs/"+outID2+"/matrix-draft", tok2,
 		map[string]any{"license_ref": "lic-live-2", "license_expires_at": past})
