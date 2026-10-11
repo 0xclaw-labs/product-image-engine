@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { jsonBody, jsonHeaders } from "@/lib/api-client";
 import { projectSourceLabel, projectStatusLabel } from "@/lib/project-labels";
+import { Input } from "@/components/ui/input";
 
 interface Project {
   id: string;
@@ -119,7 +120,7 @@ export default function ProjectsPage() {
             <div className="row">
               <div>
                 <label>工程名称</label>
-                <input
+                <Input
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   required
@@ -127,7 +128,7 @@ export default function ProjectsPage() {
               </div>
               <div>
                 <label>用途</label>
-                <input
+                <Input
                   value={form.usage_kind}
                   onChange={(e) =>
                     setForm({ ...form, usage_kind: e.target.value })
