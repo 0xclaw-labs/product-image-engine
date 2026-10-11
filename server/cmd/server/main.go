@@ -21,6 +21,7 @@ import (
 	"github.com/bianjiefilm/product-image-engine/server/internal/billassemble"
 	"github.com/bianjiefilm/product-image-engine/server/internal/config"
 	"github.com/bianjiefilm/product-image-engine/server/internal/httpapi"
+	"github.com/bianjiefilm/product-image-engine/server/internal/matrixdraftclient"
 	"github.com/bianjiefilm/product-image-engine/server/internal/imagetmpl"
 	"github.com/bianjiefilm/product-image-engine/server/internal/platform"
 	"github.com/bianjiefilm/product-image-engine/server/internal/sizeadapt"
@@ -69,8 +70,16 @@ func main() {
 		log.Fatalf("product-image-server: 内置模板集校验失败: %v", err)
 	}
 
+	// 矩阵持久草稿服务客户端(HUI-2388):配置了 MATRIX_DRAFT_BASE_URL 才装配;
+	// 未配置 = 源端送矩阵端点 fail-closed 503,不伪造草稿。
+	var matrixDrafts *matrixdraftclient.Client
+	if cfg.MatrixDraftBaseURL != "" {
+		matrixDrafts = &matrixdraftclient.Client{BaseURL: cfg.MatrixDraftBaseURL}
+	}
+
 	s := &httpapi.Server{
 		Cfg: cfg, St: st, Registry: registry, Presets: presets, TplBuiltins: tplBuiltins,
+		MatrixDrafts: matrixDrafts,
 		Ident:     &platform.IdentityClient{BaseURL: cfg.IdentityBaseURL, AppID: cfg.IdentityAppID, Token: cfg.IdentityToken},
 		Verify:    platform.NewVerifier(cfg.IdentityBaseURL, cfg.IdentityAppID, cfg.IdentityIssuer),
 		Tasks:     &platform.TaskClient{BaseURL: cfg.TaskBaseURL, AppID: cfg.IdentityAppID, Token: cfg.TaskToken},

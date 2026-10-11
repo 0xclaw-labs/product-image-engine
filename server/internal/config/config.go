@@ -54,6 +54,11 @@ type Config struct {
 	// 为空时不发(接收端 401 走既有 failed/resend 兜底)。
 	OrderInternalToken string
 
+	// --- HUI-2388:选定图片进真实矩阵持久草稿服务 ---
+	// MATRIX_DRAFT_BASE_URL:public-ai matrixdraft 服务地址(loopback 部署)。
+	// 空 = 未配置,送矩阵端点 fail-closed 503,不伪造草稿。
+	MatrixDraftBaseURL string
+
 	// --- HUI-1703 FEAT-0204:电商尺寸适配(纯确定性,不触生成/计费) ---
 	SizeAdaptEnabled bool // FEATURE_SIZE_ADAPT,默认 off(off 时尺寸适配路由不注册=404 不可见)
 	// PRODUCT_SIZE_PRESETS:预设集 JSON 路径(可选;缺省用内嵌公开常见规格整理,
@@ -162,6 +167,8 @@ func Load() Config {
 		RegistryManifestPath: os.Getenv("PRODUCT_REGISTRY_MANIFEST"),
 		ReceiptKeys:          os.Getenv("PRODUCT_RECEIPT_KEYS"),
 		OrderInternalToken:   os.Getenv("PRODUCT_ORDER_INTERNAL_TOKEN"),
+
+		MatrixDraftBaseURL:   os.Getenv("MATRIX_DRAFT_BASE_URL"),
 
 		SizeAdaptEnabled: getBoolEnv("FEATURE_SIZE_ADAPT", false),
 		SizePresetsPath:  os.Getenv("PRODUCT_SIZE_PRESETS"),
