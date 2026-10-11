@@ -83,12 +83,14 @@ func TestCampaignReceiptForwardLegRegisteredTarget(t *testing.T) {
 	out, _ := registered["output"].(map[string]any)
 	outID, _ := out["id"].(string)
 
-	// 未选定 → 诚实 409(面不动)。
+	// 未选定 → 诚实 409(面不动)。状态码直接钉死,不得只靠 body 错误码代理
+	// (错误码是补充断言,不是状态码的替代品)。
 	st, denied := f.do(t, "POST", "/api/v1/projects/"+projID+"/outputs/"+outID+"/receipt", tok, nil)
 	if st != 409 {
-		if code, _ := errCodeOf(denied); code != "version_not_selected" {
-			t.Fatalf("未选定错误码: %d %v", st, denied)
-		}
+		t.Fatalf("未选定应诚实 409: %d %v", st, denied)
+	}
+	if code, _ := errCodeOf(denied); code != "version_not_selected" {
+		t.Fatalf("未选定错误码: %d %v", st, denied)
 	}
 	// 明确选定这一版。
 	st, _ = f.do(t, "POST", "/api/v1/projects/"+projID+"/campaign-selection", tok, map[string]any{"output_id": outID})
