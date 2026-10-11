@@ -193,7 +193,6 @@ func (s *Server) collectMatrixFacts(ctx context.Context, p platform.Principal, p
 	facts.GrantRef = grantStandIn(p.Tenant())
 	if binding, berr := s.St.GetBindingByProject(ctx, p.Tenant(), projID); berr == nil {
 		facts.SourceProjectID = binding.SourceRef
-		facts.GrantRef = binding.ID
 		facts.SourceKind = "bound"
 		if snap, serr := s.St.GetSnapshot(ctx, p.Tenant(), binding.CurrentSnapshotID); serr == nil {
 			var profile struct {
