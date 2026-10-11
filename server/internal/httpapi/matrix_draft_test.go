@@ -242,6 +242,104 @@ func TestMatrixDraftLicenseExpirySameInstantDifferentNotation(t *testing.T) {
 	}
 }
 
+// ---- 漂移窗口 documentation-test:钉住行为,不改行为 -------------------------------
+
+// TestMatrixDraftSnapshotDriftWindowDocumented 钉住"绑定新增快照后,同 output 同
+// license 再送"的当前行为(只观察,不断言"应然")。
+//
+// 机理:目的端幂等键含 facts.Revision;Revision=snapshotOrdinal=output 快照在
+// 绑定快照时间线(新→旧)里的位置 len-i(旧端=1)。向时间线头部追加新快照时,
+// 旧快照的 i 与 len 同步 +1,序号稳定 → 同 output 同事实再送仍是同键,目的端
+// 幂等重放同一草稿,源端 ref 原样不变。
+//
+// 消费方须知(若本测试失败即出现"目的端新草稿键 + 响应回旧 ref"的漂移窗口):
+// 窗口期内同一响应里 matrix_draft(目的端新键)与 ref(源端旧登记)指向不同
+// 草稿;权威登记以源端 ref.DraftID 为准,目的端新草稿成为孤儿键,不会被源端
+// 回查引用;修复方向是"事实随版本保持"(revision 变化即 matrix_draft_facts_conflict),
+// 属行为变更,不在本测试范围。
+func TestMatrixDraftSnapshotDriftWindowDocumented(t *testing.T) {
+	eco := newEcoStub(t)
+	f := newFixture(t, func(c *config.Config) {
+		c.UploadBaseURL = eco.srv.URL
+		c.UploadToken = "up-tok"
+	})
+	attachRegistry(t, f, mustRegistry(t, eco.srv.URL+"/internal/v1/handoff/receipts"))
+	projID, outID, tok, tenant := campaignProjectWithOutput(t, f, "md-drift@x.com", "h-md-drift-1")
+	_, _ = f.do(t, "POST", "/api/v1/projects/"+projID+"/campaign-selection", tok, map[string]any{"output_id": outID})
+
+	// 忠实目的端桩:幂等键含 revision——同 revision 重放同草稿,异 revision 新键。
+	// (newCountingStub 的"第二次必 replay"对键变化不忠实,故专用。)
+	var seenRev []int
+	draftsByRev := map[int]string{}
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /v1/matrix-drafts", func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Revision int `json:"revision"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		seenRev = append(seenRev, body.Revision)
+		id, replay := draftsByRev[body.Revision]
+		if !replay {
+			id = fmt.Sprintf("dft_rev_%d", body.Revision)
+			draftsByRev[body.Revision] = id
+		}
+		_ = json.NewEncoder(w).Encode(matrixdraftclient.Draft{
+			ID: id, SchemaVersion: matrixdraftclient.DraftSchema, IdempotentReplay: replay,
+		})
+	})
+	stub := httptest.NewServer(mux)
+	t.Cleanup(stub.Close)
+	f.srv.MatrixDrafts = &matrixdraftclient.Client{BaseURL: stub.URL}
+	f.rearm(t)
+
+	// 首送:输出落在绑定首快照上 → revision=1 → 201 新草稿。
+	st, first := f.do(t, "POST", "/api/v1/projects/"+projID+"/outputs/"+outID+"/matrix-draft", tok,
+		map[string]any{"license_ref": "lic-drift"})
+	if st != 201 {
+		t.Fatalf("首送应 201: %d %v", st, first)
+	}
+	ref1, _ := first["ref"].(map[string]any)
+	if ref1 == nil || ref1["draft_id"] != "dft_rev_1" {
+		t.Fatalf("首送应登记 dft_rev_1: %v", first["ref"])
+	}
+
+	// 绑定新增快照:同来源工程新版交接(rev-2,新凭据——一次性兑换拒绝异内容
+	// 重放同凭据)→ pending;采纳为当前快照。五元组 source_ref 不变 → 同一绑定。
+	doc2 := handoffDoc("h-md-drift-2", "touch-engine", "campaign", tenant, "src-h-md-drift-1", "bind-h-md-drift-2", "rev-2", "brief-1")
+	st, acc2 := f.do(t, "POST", "/api/v1/handoffs/accept", tok, acceptBody(doc2, "主图"))
+	if st != 200 {
+		t.Fatalf("新版交接应 200: %d %v", st, acc2)
+	}
+	pending, _ := acc2["pending_snapshot"].(map[string]any)
+	if pending == nil {
+		t.Fatalf("新版交接应给待采用快照: %v", acc2)
+	}
+	binding, _ := acc2["binding"].(map[string]any)
+	st, adopted := f.do(t, "POST", "/api/v1/bindings/"+binding["id"].(string)+"/adopt", tok,
+		map[string]any{"snapshot_id": pending["id"]})
+	if st != 200 || adopted["adopted"] != true {
+		t.Fatalf("采纳新快照应 200: %d %v", st, adopted)
+	}
+
+	// 同 output 同 license 再送:钉住当前行为(序号稳定 → 同键幂等重放,ref 不变)。
+	st, again := f.do(t, "POST", "/api/v1/projects/"+projID+"/outputs/"+outID+"/matrix-draft", tok,
+		map[string]any{"license_ref": "lic-drift"})
+	if st != 200 {
+		t.Fatalf("同 output 同 license 再送当前行为应 200 幂等: %d %v", st, again)
+	}
+	ad, _ := again["matrix_draft"].(map[string]any)
+	if ad["draft_id"] != "dft_rev_1" || ad["idempotent_replay"] != true {
+		t.Fatalf("漂移窗口:目的端换新草稿键而源端 ref 未动(见函数头消费方须知): %v", ad)
+	}
+	ref2, _ := again["ref"].(map[string]any)
+	if ref2["id"] != ref1["id"] || ref2["draft_id"] != ref1["draft_id"] {
+		t.Fatalf("源端登记必须原样不变: %v vs %v", ref1, ref2)
+	}
+	if len(seenRev) != 2 || seenRev[0] != 1 || seenRev[1] != 1 {
+		t.Fatalf("同 output 两次送矩阵 revision 必须稳定: %v", seenRev)
+	}
+}
+
 // ---- livetest:对真实 matrixdraft 服务(@d8facafc) ---------------------------------
 
 func TestMatrixDraftLiveRealService(t *testing.T) {
