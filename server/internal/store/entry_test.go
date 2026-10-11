@@ -38,7 +38,7 @@ func TestEntrySessionIsolatesPersonalFromCustomerSource(t *testing.T) {
 		AccountID: "acct_1", WorkspaceKind: "organization", WorkspaceScope: "org_customer",
 		StorageTenant: "org_customer", ProjectID: orgProject.ID,
 		SourceType: "order", SourceRef: "ord_9",
-		ReturnHref: "https://order.example/orders/ord_9",
+		ReturnHref:  "https://order.example/orders/ord_9",
 		Fingerprint: "fp-order", Status: "queued", QuoteLabel: "待确认",
 		AuthorizedAssets: []string{"asset_9"},
 	})

@@ -74,9 +74,9 @@ func TestOrderAndCampaignRestoreAssetsAndExactReturn(t *testing.T) {
 	})
 	orderBody := map[string]any{
 		"source_type": "order", "source_ref": "ord_9", "source_tenant_id": "org_customer",
-		"return_href": "https://order.example/orders/ord_9",
+		"return_href":       "https://order.example/orders/ord_9",
 		"authorized_assets": []any{map[string]any{"asset_ref": "asset_ord", "owner_tenant": "org_customer"}},
-		"usage_kind": "电商主图", "width_px": 800, "height_px": 800, "background_direction": "场景",
+		"usage_kind":        "电商主图", "width_px": 800, "height_px": 800, "background_direction": "场景",
 	}
 	st, body := f.do(t, "POST", "/api/v1/entry/source", tok, orderBody)
 	if st != http.StatusCreated {
@@ -116,18 +116,18 @@ func TestOrderAndCampaignRestoreAssetsAndExactReturn(t *testing.T) {
 	}
 	campSt, camp := f.do(t, "POST", "/api/v1/entry/source", tok, map[string]any{
 		"source_type": "campaign", "source_ref": "cmp_3", "source_tenant_id": "org_other",
-		"return_href": "https://campaign.example/c/cmp_3?stage=design",
+		"return_href":       "https://campaign.example/c/cmp_3?stage=design",
 		"authorized_assets": []any{map[string]any{"asset_ref": "asset_cmp", "owner_tenant": "org_other"}},
-		"usage_kind": "活动主图", "width_px": 1080, "height_px": 1080, "background_direction": "节日",
+		"usage_kind":        "活动主图", "width_px": 1080, "height_px": 1080, "background_direction": "节日",
 	})
 	if campSt != http.StatusCreated || camp["return_href"] != "https://campaign.example/c/cmp_3?stage=design" {
 		t.Fatalf("活动入口: %d %v", campSt, camp)
 	}
 	deniedSt, denied := f.do(t, "POST", "/api/v1/entry/source", tok, map[string]any{
 		"source_type": "order", "source_ref": "ord_x", "source_tenant_id": "org_stranger",
-		"return_href": "https://order.example/orders/ord_x",
+		"return_href":       "https://order.example/orders/ord_x",
 		"authorized_assets": []any{map[string]any{"asset_ref": "asset_x", "owner_tenant": "org_stranger"}},
-		"usage_kind": "电商主图", "width_px": 800, "height_px": 800,
+		"usage_kind":        "电商主图", "width_px": 800, "height_px": 800,
 	})
 	if deniedSt != http.StatusForbidden {
 		t.Fatalf("未授权组织应拒绝: %d %v", deniedSt, denied)
