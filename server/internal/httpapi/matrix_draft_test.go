@@ -12,9 +12,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -433,5 +435,43 @@ func TestMatrixDraftLiveRealService(t *testing.T) {
 	}
 	if code, _ := errCodeOf(expired); code != "license_expired" {
 		t.Fatalf("错误码应为 license_expired: %v", expired)
+	}
+
+	// 直连目的端 video 负例:客户端 ContentType 常量钉死为 image(不开放),
+	// 客户端编不出 video——"其他 content_type 被目的端 409 wrong_type 拒绝"
+	// 的契约面只能用原始 HTTP 绕过客户端直打目的端验证。目的端 validate()
+	// 先查 content_type,故 stand-in grant/brand 值即可触发该面。
+	videoBody := fmt.Sprintf(`{
+		"schema_version": %q, "source_app": "product-image",
+		"source_project_id": "src-video-neg-%s", "revision": 1,
+		"asset_id": "asset-video-neg-%s", "asset_hash": "%s",
+		"content_type": "video", "grant_ref": %q, "tenant_id": %q,
+		"brand_id": %q, "payer_id": %q, "license_ref": "lic-video-neg",
+		"return_target": {"app": "product-image", "path": "/projects/x"}
+	}`, matrixdraftclient.SchemaVersion, runSuffix, runSuffix, strings.Repeat("a", 64),
+		sf["grant_ref"], tenant, sf["brand_id"], tenant)
+	vreq, verr := http.NewRequest(http.MethodPost, base+"/v1/matrix-drafts", strings.NewReader(videoBody))
+	if verr != nil {
+		t.Fatalf("构造 video 负例: %v", verr)
+	}
+	vreq.Header.Set("Content-Type", "application/json")
+	vreq.Header.Set("X-Matrix-Tenant", tenant)
+	vres, derr := (&http.Client{Timeout: 15 * time.Second}).Do(vreq)
+	if derr != nil {
+		t.Fatalf("直连目的端 video 负例: %v", derr)
+	}
+	defer vres.Body.Close()
+	vraw, _ := io.ReadAll(io.LimitReader(vres.Body, 1<<20))
+	if vres.StatusCode != http.StatusConflict {
+		t.Fatalf("content_type=video 必须被目的端 409 拒绝: %d %s", vres.StatusCode, string(vraw))
+	}
+	var vbody struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	_ = json.Unmarshal(vraw, &vbody)
+	if vbody.Error.Code != "wrong_type" {
+		t.Fatalf("video 负例错误码必须 wrong_type: %s", string(vraw))
 	}
 }
