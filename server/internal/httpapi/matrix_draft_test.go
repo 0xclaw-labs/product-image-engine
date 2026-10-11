@@ -12,9 +12,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -191,6 +193,155 @@ func TestMatrixDraftMissingLicenseRefRejected(t *testing.T) {
 	}
 }
 
+// TestMatrixDraftLicenseExpirySameInstantDifferentNotation 同一时刻不同写法
+// (+08:00 vs Z)不算许可事实改写:比较归一化成 UTC 时刻,不再 409;存储保留
+// 首送原串;解析失败回退原串比较(真异事实仍 409)。
+func TestMatrixDraftLicenseExpirySameInstantDifferentNotation(t *testing.T) {
+	eco := newEcoStub(t)
+	f := newFixture(t, func(c *config.Config) {
+		c.UploadBaseURL = eco.srv.URL
+		c.UploadToken = "up-tok"
+	})
+	attachRegistry(t, f, mustRegistry(t, eco.srv.URL+"/internal/v1/handoff/receipts"))
+	projID, outID, tok, _ := campaignProjectWithOutput(t, f, "md-exp@x.com", "h-md-exp-1")
+	_, _ = f.do(t, "POST", "/api/v1/projects/"+projID+"/campaign-selection", tok, map[string]any{"output_id": outID})
+	stub := newCountingStub(t)
+	f.srv.MatrixDrafts = &matrixdraftclient.Client{BaseURL: stub.srv.URL}
+	f.rearm(t)
+
+	st, first := f.do(t, "POST", "/api/v1/projects/"+projID+"/outputs/"+outID+"/matrix-draft", tok,
+		map[string]any{"license_ref": "lic-exp", "license_expires_at": "2030-01-01T08:00:00+08:00"})
+	if st != 201 {
+		t.Fatalf("首送应 201: %d %v", st, first)
+	}
+	ref1, _ := first["ref"].(map[string]any)
+
+	// 同一时刻,Z 写法 → 幂等重放,不再 409。
+	st, again := f.do(t, "POST", "/api/v1/projects/"+projID+"/outputs/"+outID+"/matrix-draft", tok,
+		map[string]any{"license_ref": "lic-exp", "license_expires_at": "2030-01-01T00:00:00Z"})
+	if st != 200 {
+		t.Fatalf("同一时刻不同写法不得 409: %d %v", st, again)
+	}
+	ref2, _ := again["ref"].(map[string]any)
+	if ref2["id"] != ref1["id"] {
+		t.Fatalf("同事实幂等 ref 不变: %v vs %v", ref1, ref2)
+	}
+	// 原串存储:落账保留首送写法,不因比较归一化而改写。
+	if ref2["license_expires_at"] != "2030-01-01T08:00:00+08:00" {
+		t.Fatalf("必须保留首送原串: %v", ref2["license_expires_at"])
+	}
+	// 时刻不同属真异事实,仍 409。
+	st, conflict := f.do(t, "POST", "/api/v1/projects/"+projID+"/outputs/"+outID+"/matrix-draft", tok,
+		map[string]any{"license_ref": "lic-exp", "license_expires_at": "2030-01-02T00:00:00Z"})
+	if st != 409 {
+		t.Fatalf("时刻不同仍须 409: %d %v", st, conflict)
+	}
+	// 解析失败回退原串比较:已有 expiry 的事实,再送不带 expiry → 409(改写)。
+	st, missing := f.do(t, "POST", "/api/v1/projects/"+projID+"/outputs/"+outID+"/matrix-draft", tok,
+		map[string]any{"license_ref": "lic-exp"})
+	if st != 409 {
+		t.Fatalf("去掉 expiry 属事实改写,须 409: %d %v", st, missing)
+	}
+}
+
+// ---- 漂移窗口 documentation-test:钉住行为,不改行为 -------------------------------
+
+// TestMatrixDraftSnapshotDriftWindowDocumented 钉住"绑定新增快照后,同 output 同
+// license 再送"的当前行为(只观察,不断言"应然")。
+//
+// 机理:目的端幂等键含 facts.Revision;Revision=snapshotOrdinal=output 快照在
+// 绑定快照时间线(新→旧)里的位置 len-i(旧端=1)。向时间线头部追加新快照时,
+// 旧快照的 i 与 len 同步 +1,序号稳定 → 同 output 同事实再送仍是同键,目的端
+// 幂等重放同一草稿,源端 ref 原样不变。
+//
+// 消费方须知(若本测试失败即出现"目的端新草稿键 + 响应回旧 ref"的漂移窗口):
+// 窗口期内同一响应里 matrix_draft(目的端新键)与 ref(源端旧登记)指向不同
+// 草稿;权威登记以源端 ref.DraftID 为准,目的端新草稿成为孤儿键,不会被源端
+// 回查引用;修复方向是"事实随版本保持"(revision 变化即 matrix_draft_facts_conflict),
+// 属行为变更,不在本测试范围。
+func TestMatrixDraftSnapshotDriftWindowDocumented(t *testing.T) {
+	eco := newEcoStub(t)
+	f := newFixture(t, func(c *config.Config) {
+		c.UploadBaseURL = eco.srv.URL
+		c.UploadToken = "up-tok"
+	})
+	attachRegistry(t, f, mustRegistry(t, eco.srv.URL+"/internal/v1/handoff/receipts"))
+	projID, outID, tok, tenant := campaignProjectWithOutput(t, f, "md-drift@x.com", "h-md-drift-1")
+	_, _ = f.do(t, "POST", "/api/v1/projects/"+projID+"/campaign-selection", tok, map[string]any{"output_id": outID})
+
+	// 忠实目的端桩:幂等键含 revision——同 revision 重放同草稿,异 revision 新键。
+	// (newCountingStub 的"第二次必 replay"对键变化不忠实,故专用。)
+	var seenRev []int
+	draftsByRev := map[int]string{}
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /v1/matrix-drafts", func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Revision int `json:"revision"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		seenRev = append(seenRev, body.Revision)
+		id, replay := draftsByRev[body.Revision]
+		if !replay {
+			id = fmt.Sprintf("dft_rev_%d", body.Revision)
+			draftsByRev[body.Revision] = id
+		}
+		_ = json.NewEncoder(w).Encode(matrixdraftclient.Draft{
+			ID: id, SchemaVersion: matrixdraftclient.DraftSchema, IdempotentReplay: replay,
+		})
+	})
+	stub := httptest.NewServer(mux)
+	t.Cleanup(stub.Close)
+	f.srv.MatrixDrafts = &matrixdraftclient.Client{BaseURL: stub.URL}
+	f.rearm(t)
+
+	// 首送:输出落在绑定首快照上 → revision=1 → 201 新草稿。
+	st, first := f.do(t, "POST", "/api/v1/projects/"+projID+"/outputs/"+outID+"/matrix-draft", tok,
+		map[string]any{"license_ref": "lic-drift"})
+	if st != 201 {
+		t.Fatalf("首送应 201: %d %v", st, first)
+	}
+	ref1, _ := first["ref"].(map[string]any)
+	if ref1 == nil || ref1["draft_id"] != "dft_rev_1" {
+		t.Fatalf("首送应登记 dft_rev_1: %v", first["ref"])
+	}
+
+	// 绑定新增快照:同来源工程新版交接(rev-2,新凭据——一次性兑换拒绝异内容
+	// 重放同凭据)→ pending;采纳为当前快照。五元组 source_ref 不变 → 同一绑定。
+	doc2 := handoffDoc("h-md-drift-2", "touch-engine", "campaign", tenant, "src-h-md-drift-1", "bind-h-md-drift-2", "rev-2", "brief-1")
+	st, acc2 := f.do(t, "POST", "/api/v1/handoffs/accept", tok, acceptBody(doc2, "主图"))
+	if st != 200 {
+		t.Fatalf("新版交接应 200: %d %v", st, acc2)
+	}
+	pending, _ := acc2["pending_snapshot"].(map[string]any)
+	if pending == nil {
+		t.Fatalf("新版交接应给待采用快照: %v", acc2)
+	}
+	binding, _ := acc2["binding"].(map[string]any)
+	st, adopted := f.do(t, "POST", "/api/v1/bindings/"+binding["id"].(string)+"/adopt", tok,
+		map[string]any{"snapshot_id": pending["id"]})
+	if st != 200 || adopted["adopted"] != true {
+		t.Fatalf("采纳新快照应 200: %d %v", st, adopted)
+	}
+
+	// 同 output 同 license 再送:钉住当前行为(序号稳定 → 同键幂等重放,ref 不变)。
+	st, again := f.do(t, "POST", "/api/v1/projects/"+projID+"/outputs/"+outID+"/matrix-draft", tok,
+		map[string]any{"license_ref": "lic-drift"})
+	if st != 200 {
+		t.Fatalf("同 output 同 license 再送当前行为应 200 幂等: %d %v", st, again)
+	}
+	ad, _ := again["matrix_draft"].(map[string]any)
+	if ad["draft_id"] != "dft_rev_1" || ad["idempotent_replay"] != true {
+		t.Fatalf("漂移窗口:目的端换新草稿键而源端 ref 未动(见函数头消费方须知): %v", ad)
+	}
+	ref2, _ := again["ref"].(map[string]any)
+	if ref2["id"] != ref1["id"] || ref2["draft_id"] != ref1["draft_id"] {
+		t.Fatalf("源端登记必须原样不变: %v vs %v", ref1, ref2)
+	}
+	if len(seenRev) != 2 || seenRev[0] != 1 || seenRev[1] != 1 {
+		t.Fatalf("同 output 两次送矩阵 revision 必须稳定: %v", seenRev)
+	}
+}
+
 // ---- livetest:对真实 matrixdraft 服务(@d8facafc) ---------------------------------
 
 func TestMatrixDraftLiveRealService(t *testing.T) {
@@ -284,5 +435,43 @@ func TestMatrixDraftLiveRealService(t *testing.T) {
 	}
 	if code, _ := errCodeOf(expired); code != "license_expired" {
 		t.Fatalf("错误码应为 license_expired: %v", expired)
+	}
+
+	// 直连目的端 video 负例:客户端 ContentType 常量钉死为 image(不开放),
+	// 客户端编不出 video——"其他 content_type 被目的端 409 wrong_type 拒绝"
+	// 的契约面只能用原始 HTTP 绕过客户端直打目的端验证。目的端 validate()
+	// 先查 content_type,故 stand-in grant/brand 值即可触发该面。
+	videoBody := fmt.Sprintf(`{
+		"schema_version": %q, "source_app": "product-image",
+		"source_project_id": "src-video-neg-%s", "revision": 1,
+		"asset_id": "asset-video-neg-%s", "asset_hash": "%s",
+		"content_type": "video", "grant_ref": %q, "tenant_id": %q,
+		"brand_id": %q, "payer_id": %q, "license_ref": "lic-video-neg",
+		"return_target": {"app": "product-image", "path": "/projects/x"}
+	}`, matrixdraftclient.SchemaVersion, runSuffix, runSuffix, strings.Repeat("a", 64),
+		sf["grant_ref"], tenant, sf["brand_id"], tenant)
+	vreq, verr := http.NewRequest(http.MethodPost, base+"/v1/matrix-drafts", strings.NewReader(videoBody))
+	if verr != nil {
+		t.Fatalf("构造 video 负例: %v", verr)
+	}
+	vreq.Header.Set("Content-Type", "application/json")
+	vreq.Header.Set("X-Matrix-Tenant", tenant)
+	vres, derr := (&http.Client{Timeout: 15 * time.Second}).Do(vreq)
+	if derr != nil {
+		t.Fatalf("直连目的端 video 负例: %v", derr)
+	}
+	defer vres.Body.Close()
+	vraw, _ := io.ReadAll(io.LimitReader(vres.Body, 1<<20))
+	if vres.StatusCode != http.StatusConflict {
+		t.Fatalf("content_type=video 必须被目的端 409 拒绝: %d %s", vres.StatusCode, string(vraw))
+	}
+	var vbody struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	_ = json.Unmarshal(vraw, &vbody)
+	if vbody.Error.Code != "wrong_type" {
+		t.Fatalf("video 负例错误码必须 wrong_type: %s", string(vraw))
 	}
 }

@@ -62,7 +62,7 @@ describe("矩阵草稿 BFF", () => {
     expect(init?.method).toBe("GET");
   });
 
-  it("POST 送矩阵透传(含 license 事实)", async () => {
+  it("POST 送矩阵透传(含 license 事实);新建 201,幂等重放 200", async () => {
     const fetchSpy = vi.fn(async () =>
       new Response(JSON.stringify({ matrix_draft: { draft_id: "md_2", idempotent_replay: false } }), { status: 201 })
     );
@@ -71,12 +71,24 @@ describe("矩阵草稿 BFF", () => {
       authed("/api/projects/p1/outputs/o1/matrix-draft", jsonInit({ license_ref: "lic-1" })),
       ctxOut("p1", "o1")
     );
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(201);
     const body = await res.json();
     expect(body.matrix_draft.draft_id).toBe("md_2");
     const [, init] = fetchSpy.mock.calls[0] as unknown as [string, RequestInit];
     expect(init.method).toBe("POST");
     expect(String(init.body)).toContain("lic-1");
+    // 同键同事实幂等重放 → 200(与 receipt 的 duplicate?200:201 约定同型)。
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(JSON.stringify({ matrix_draft: { draft_id: "md_2", idempotent_replay: true } }), { status: 200 })
+      )
+    );
+    const replay = await draftPOST(
+      authed("/api/projects/p1/outputs/o1/matrix-draft", jsonInit({ license_ref: "lic-1" })),
+      ctxOut("p1", "o1")
+    );
+    expect(replay.status).toBe(200);
   });
 
   it("上游 409 idempotency_conflict 原样上浮", async () => {
