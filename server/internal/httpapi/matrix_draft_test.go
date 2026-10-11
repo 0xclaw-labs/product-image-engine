@@ -191,6 +191,57 @@ func TestMatrixDraftMissingLicenseRefRejected(t *testing.T) {
 	}
 }
 
+// TestMatrixDraftLicenseExpirySameInstantDifferentNotation 同一时刻不同写法
+// (+08:00 vs Z)不算许可事实改写:比较归一化成 UTC 时刻,不再 409;存储保留
+// 首送原串;解析失败回退原串比较(真异事实仍 409)。
+func TestMatrixDraftLicenseExpirySameInstantDifferentNotation(t *testing.T) {
+	eco := newEcoStub(t)
+	f := newFixture(t, func(c *config.Config) {
+		c.UploadBaseURL = eco.srv.URL
+		c.UploadToken = "up-tok"
+	})
+	attachRegistry(t, f, mustRegistry(t, eco.srv.URL+"/internal/v1/handoff/receipts"))
+	projID, outID, tok, _ := campaignProjectWithOutput(t, f, "md-exp@x.com", "h-md-exp-1")
+	_, _ = f.do(t, "POST", "/api/v1/projects/"+projID+"/campaign-selection", tok, map[string]any{"output_id": outID})
+	stub := newCountingStub(t)
+	f.srv.MatrixDrafts = &matrixdraftclient.Client{BaseURL: stub.srv.URL}
+	f.rearm(t)
+
+	st, first := f.do(t, "POST", "/api/v1/projects/"+projID+"/outputs/"+outID+"/matrix-draft", tok,
+		map[string]any{"license_ref": "lic-exp", "license_expires_at": "2030-01-01T08:00:00+08:00"})
+	if st != 201 {
+		t.Fatalf("首送应 201: %d %v", st, first)
+	}
+	ref1, _ := first["ref"].(map[string]any)
+
+	// 同一时刻,Z 写法 → 幂等重放,不再 409。
+	st, again := f.do(t, "POST", "/api/v1/projects/"+projID+"/outputs/"+outID+"/matrix-draft", tok,
+		map[string]any{"license_ref": "lic-exp", "license_expires_at": "2030-01-01T00:00:00Z"})
+	if st != 200 {
+		t.Fatalf("同一时刻不同写法不得 409: %d %v", st, again)
+	}
+	ref2, _ := again["ref"].(map[string]any)
+	if ref2["id"] != ref1["id"] {
+		t.Fatalf("同事实幂等 ref 不变: %v vs %v", ref1, ref2)
+	}
+	// 原串存储:落账保留首送写法,不因比较归一化而改写。
+	if ref2["license_expires_at"] != "2030-01-01T08:00:00+08:00" {
+		t.Fatalf("必须保留首送原串: %v", ref2["license_expires_at"])
+	}
+	// 时刻不同属真异事实,仍 409。
+	st, conflict := f.do(t, "POST", "/api/v1/projects/"+projID+"/outputs/"+outID+"/matrix-draft", tok,
+		map[string]any{"license_ref": "lic-exp", "license_expires_at": "2030-01-02T00:00:00Z"})
+	if st != 409 {
+		t.Fatalf("时刻不同仍须 409: %d %v", st, conflict)
+	}
+	// 解析失败回退原串比较:已有 expiry 的事实,再送不带 expiry → 409(改写)。
+	st, missing := f.do(t, "POST", "/api/v1/projects/"+projID+"/outputs/"+outID+"/matrix-draft", tok,
+		map[string]any{"license_ref": "lic-exp"})
+	if st != 409 {
+		t.Fatalf("去掉 expiry 属事实改写,须 409: %d %v", st, missing)
+	}
+}
+
 // ---- livetest:对真实 matrixdraft 服务(@d8facafc) ---------------------------------
 
 func TestMatrixDraftLiveRealService(t *testing.T) {
