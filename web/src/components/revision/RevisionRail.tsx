@@ -44,7 +44,7 @@ const REGION_LABEL: Record<string, string> = {
 function publicMessage(raw: string): string {
   if (!raw) return "没有完成。可以稍后再试，不会自动重做。";
   if (/provider|qwen|preserve_|partialedit|sha256|supplier|供应商|modelxing|debug|subject_lock/i.test(raw)) {
-    return "这一步没有完成。商品会保持原样。本页不会整张重画，也不会另编一笔费用。";
+    return "该步骤未完成，商品保持原样；不会整张重画，也不会产生额外费用。";
   }
   return raw;
 }
