@@ -4,6 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import EcoTopNav, { type NavAppLink } from "@/components/eco-nav/EcoTopNav";
 import { useWorkbenchFact, WorkbenchProvider } from "@/components/eco-nav/workbench";
+import type { LaunchRow } from "@/lib/eco-nav/registry";
 import {
   CURRENT_APP,
   applyPayerSwitch,
@@ -34,6 +35,25 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
   const [chosen, setChosen] = useState<PayerScope | null>(null);
   const [memberships, setMemberships] = useState<PayerScope[]>([]);
   const [book, setBook] = useState<QuoteBook>({ quotes: [], results: [] });
+  // HUI-2227 残差②：登记真源来自 /api/eco-nav/launches（服务端读 vendored
+  // public-ai production-manifest.json）；拉取失败保持仅当前应用（fail-closed），
+  // 客户端不再内联部署期目录。
+  const [launchRows, setLaunchRows] = useState<LaunchRow[]>([]);
+
+  useEffect(() => {
+    if (!show) return;
+    let cancelled = false;
+    (async () => {
+      const res = await fetch("/api/eco-nav/launches");
+      const body = (await res.json().catch(() => null)) as { launches?: LaunchRow[] } | null;
+      if (!cancelled && Array.isArray(body?.launches)) {
+        setLaunchRows(body.launches);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [show]);
 
   useEffect(() => {
     if (!show) return;
@@ -89,23 +109,15 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
       current: true,
     },
   ];
-  const rawLaunches = process.env.NEXT_PUBLIC_ECO_APP_LAUNCHES;
-  if (rawLaunches) {
-    try {
-      const parsed = JSON.parse(rawLaunches) as { appId: string; display: string; launchUrl: string }[];
-      for (const item of parsed) {
-        if (item.appId === CURRENT_APP.appId) continue;
-        const plan = manualAppSwitch({ launchUrl: item.launchUrl, appId: item.appId });
-        apps.push({
-          appId: item.appId,
-          display: item.display,
-          href: plan.href,
-          current: false,
-        });
-      }
-    } catch {
-      // 目录不是合法 JSON 时不伪造跳转地址。
-    }
+  for (const row of launchRows) {
+    if (row.app_id === CURRENT_APP.appId) continue;
+    const plan = manualAppSwitch({ launchUrl: row.url, appId: row.app_id });
+    apps.push({
+      appId: row.app_id,
+      display: row.display_name,
+      href: plan.href,
+      current: false,
+    });
   }
   const switchable = memberships.filter(
     (item) => item.tenantId !== scope.tenantId || item.kind !== scope.kind
