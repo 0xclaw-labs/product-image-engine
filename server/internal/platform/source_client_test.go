@@ -291,6 +291,22 @@ func TestSourceDecodeOutputOriginalReference(t *testing.T) {
 		t.Fatal(e)
 	}
 }
+func TestSourceDecodeTaskAcceptsProviderProvenanceKeysStillRejectsUnknown(t *testing.T) {
+	r := sourceWireRun()
+	var m map[string]any
+	json.Unmarshal(sourceTaskJSON(r), &m)
+	m["provider_created"] = 1791815919
+	m["provider_url"] = "https://dashscope-0484.oss-accelerate.aliyuncs.com/ab/cd/20261012/deadbeef/01234567-89ab-cdef-0123-456789abcdef.png"
+	raw, _ := json.Marshal(m)
+	if _, e := decodeSourceTask(raw, r); e != nil {
+		t.Fatal("platform provenance keys must decode as informational", e)
+	}
+	m["mystery_stamp"] = 1
+	raw, _ = json.Marshal(m)
+	if _, e := decodeSourceTask(raw, r); !errors.Is(e, si.ErrInvariant) {
+		t.Fatal("unknown keys must still fail closed")
+	}
+}
 func TestSourceDecodeTaskAcceptsPlatformUppercaseStatus(t *testing.T) {
 	r := sourceWireRun()
 	var m map[string]any
