@@ -53,6 +53,20 @@ func sourceBytesFact(data []byte) si.Output {
 	sum := sha256.Sum256(data)
 	return si.Output{ContentType: "image/png", SHA256: hex.EncodeToString(sum[:]), SizeBytes: int64(len(data))}
 }
+func TestNewSourceDownloaderSplitsSemicolonHostList(t *testing.T) {
+	// HUI-2295 uirun-11: the platform ships the runbook semicolon contract;
+	// a two-host list must register BOTH hosts instead of fail-closing.
+	d, e := newSourceDownloader("a.oss-cn-hangzhou.aliyuncs.com;b.oss-cn-hangzhou.aliyuncs.com", nil)
+	if e != nil {
+		t.Fatal("semicolon list rejected:", e)
+	}
+	if !d.hosts["a.oss-cn-hangzhou.aliyuncs.com"] || !d.hosts["b.oss-cn-hangzhou.aliyuncs.com"] {
+		t.Fatal("not both hosts registered:", d.hosts)
+	}
+	if _, e := newSourceDownloader("a.oss-cn-hangzhou.aliyuncs.com,b.oss-cn-hangzhou.aliyuncs.com", nil); e == nil {
+		t.Fatal("comma list must still fail closed (unknown separator)")
+	}
+}
 func sourceFetchFixture(t *testing.T, handler http.HandlerFunc) (*sourceDownloader, *atomic.Int64) {
 	t.Helper()
 	key, e := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
