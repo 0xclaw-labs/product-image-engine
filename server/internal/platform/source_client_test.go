@@ -109,7 +109,7 @@ func TestSourceWireUnconfigured(t *testing.T) {
 func sourceTaskJSON(r si.Run) []byte {
 	q := r.Quote
 	s := r.Intent.Scope
-	raw, _ := json.Marshal(map[string]any{"task_id": "task-a", "funding_version": "source_reservation_v1", "app_id": s.AppID, "payer_account_id": s.PayerAccountID, "payer_user_id": s.UserID, "project_id": s.ProjectID, "idempotency_key": r.TaskKey, "capability": r.Intent.Capability, "provider": r.Intent.Provider, "status": "queued", "phase": "hold_pending", "usage_id": q.UsageID, "quote_id": q.QuoteID, "quantity": q.Quantity, "unit_price_minor": q.UnitPriceMinor, "amount_minor": q.AmountMinor, "pricing_version": q.PricingVersion, "business_ref": q.BusinessRef, "hold_id": "", "charge_id": "", "release_id": "", "provider_result_received": false, "output_ready": false, "result_json": "", "error_code": "", "next_retry_at": "", "created_at": "2026-10-01T00:00:00Z"})
+	raw, _ := json.Marshal(map[string]any{"task_id": "task-a", "funding_version": "source_reservation_v1", "app_id": s.AppID, "payer_account_id": s.PayerAccountID, "payer_user_id": s.UserID, "project_id": "project-a", "idempotency_key": r.TaskKey, "capability": r.Intent.Capability, "provider": r.Intent.Provider, "status": "queued", "phase": "hold_pending", "usage_id": q.UsageID, "quote_id": q.QuoteID, "quantity": q.Quantity, "unit_price_minor": q.UnitPriceMinor, "amount_minor": q.AmountMinor, "pricing_version": q.PricingVersion, "business_ref": q.BusinessRef, "hold_id": "", "charge_id": "", "release_id": "", "provider_result_received": false, "output_ready": false, "result_json": "", "error_code": "", "next_retry_at": "", "created_at": "2026-10-01T00:00:00Z"})
 	return raw
 }
 func TestSourceDecodeTaskOriginalTuple(t *testing.T) {
@@ -305,6 +305,31 @@ func TestSourceDecodeTaskAcceptsProviderProvenanceKeysStillRejectsUnknown(t *tes
 	raw, _ = json.Marshal(m)
 	if _, e := decodeSourceTask(raw, r); !errors.Is(e, si.ErrInvariant) {
 		t.Fatal("unknown keys must still fail closed")
+	}
+}
+func TestSourceDecodeTaskResultAcceptsProviderProvenanceStillRejectsUnknown(t *testing.T) {
+	r := sourceWireRun()
+	var m map[string]any
+	json.Unmarshal(sourceTaskJSON(r), &m)
+	out := map[string]any{"asset_id": "asset-a", "reference_id": "ref-a", "project_id": "project-a", "content_type": "image/png", "sha256": strings.Repeat("a", 64), "size_bytes": 1024,
+		"provider_created": 1791815919, "provider_url": "https://dashscope-0484.oss-accelerate.aliyuncs.com/ab/cd/20261012/deadbeef/01234567-89ab-cdef-0123-456789abcdef.png"}
+	b, _ := json.Marshal(out)
+	m["result_json"] = string(b)
+	m["output_ready"] = true
+	m["status"] = "succeeded"
+	m["phase"] = "succeeded"
+	m["hold_id"] = "hold-a"
+	m["charge_id"] = "charge-a"
+	raw, _ := json.Marshal(m)
+	if _, e := decodeSourceTask(raw, r); e != nil {
+		t.Fatal("inner provenance keys must decode as informational", e)
+	}
+	out["mystery_stamp"] = 1
+	b, _ = json.Marshal(out)
+	m["result_json"] = string(b)
+	raw, _ = json.Marshal(m)
+	if _, e := decodeSourceTask(raw, r); !errors.Is(e, si.ErrInvariant) {
+		t.Fatal("unknown inner keys must still fail closed")
 	}
 }
 func TestSourceDecodeTaskAcceptsPlatformUppercaseStatus(t *testing.T) {
