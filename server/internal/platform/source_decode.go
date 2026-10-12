@@ -406,7 +406,12 @@ func decodeSourceBill(raw []byte, r si.Run) (si.BillFact, error) {
 	return f, nil
 }
 func decodeSourceTask(raw []byte, r si.Run) (si.TaskFact, error) {
-	m, e := sourceObject(raw, "task_id funding_version app_id payer_account_id payer_user_id project_id idempotency_key capability provider status phase usage_id quote_id quantity unit_price_minor amount_minor pricing_version business_ref hold_id charge_id release_id provider_result_received output_ready result_json error_code next_retry_at created_at", "")
+	// provider_created/provider_url (HUI-3182 follow-up) are informational
+	// provenance the platform adds to succeeded task facts; the product does
+	// not act on them. They ride in the OPTIONAL set so the succeeded verdict
+	// decodes while every checked field stays required and unknown keys still
+	// fail closed.
+	m, e := sourceObject(raw, "task_id funding_version app_id payer_account_id payer_user_id project_id idempotency_key capability provider status phase usage_id quote_id quantity unit_price_minor amount_minor pricing_version business_ref hold_id charge_id release_id provider_result_received output_ready result_json error_code next_retry_at created_at", "provider_created provider_url")
 	if e != nil || r.Quote == nil {
 		return si.TaskFact{}, si.ErrInvariant
 	}
