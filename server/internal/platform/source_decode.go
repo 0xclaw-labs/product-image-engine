@@ -448,7 +448,11 @@ func decodeSourceTask(raw []byte, r si.Run) (si.TaskFact, error) {
 	}
 	result := sourceString(m, "result_json")
 	if result != "" {
-		out, e := sourceObject([]byte(result), "asset_id content_type sha256 size_bytes reference_id project_id", "")
+		// provider_created/provider_url (HUI-3182 follow-up) ride the
+		// succeeded result payload as informational provenance; they land in
+		// the OPTIONAL set so the artifact verdict decodes while the six
+		// checked fields stay required and unknown keys still fail closed.
+		out, e := sourceObject([]byte(result), "asset_id content_type sha256 size_bytes reference_id project_id", "provider_created provider_url")
 		if e != nil {
 			return f, e
 		}
