@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 function publicMessage(raw: string): string {
-  if (!raw) return "没有核对成。不会重新做图，也不会再扣一次。";
+  if (!raw) return "核对未完成。不会重新做图，也不会重复扣费。";
   if (/provider|qwen|task_id|charge_ref|idempotency|debug|sha256/i.test(raw)) {
     return "原记录还对不上。不会重新做图，也不会再扣一次。";
   }
@@ -27,16 +27,16 @@ export function RecoveryStrip({ projectId }: { projectId?: string }) {
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
-        setNote(publicMessage(data?.error?.message ?? "没有核对成。不会重新做图，也不会再扣一次。"));
+        setNote(publicMessage(data?.error?.message ?? "核对未完成。不会重新做图，也不会重复扣费。"));
         return;
       }
       if (data?.resubmit === true || data?.recharge === true || data?.regenerate === true) {
-        setNote("服务端要求另看原记录。本页不会自动重做，也不会再扣一次。");
+        setNote("结果需在原记录中查看。系统不会自动重做，也不会重复扣费。");
         return;
       }
       setNote("已按原记录核对。没有重新做图，也没有再扣费。结算仍待确认。");
     } catch {
-      setNote("网络中断。不会重新做图，也不会再扣一次。");
+      setNote("网络中断。未重新做图，也未重复扣费。");
     } finally {
       setBusy(false);
     }
