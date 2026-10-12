@@ -1,0 +1,15 @@
+upstream: bianjiefilm/public-ai
+path: docs/contracts/app-registry/v1/production-manifest.json
+pin: 15573a95 (blob, origin/main @ f9bf404c, 2026-10-12)
+tree: -
+status: VENDORED
+
+HUI-2227 残差②：web 导航消费的真源从 NEXT_PUBLIC_ECO_APP_LAUNCHES（部署期
+内联进客户端包）换为 public-ai 生产注册表实况。本文件与 public-ai 逐字节
+相同（git blob 15573a95 对拍一致），只能整体替换，不得手改。
+
+生产表没有的行（本应用 product-image、orders、touch-engine、leads-engine）
+诚实缺失——registeredLaunchMap 不产该行，客户端不伪造跳转地址。
+本仓 server 侧 internal/appregistry 的内嵌缺省清单是另一条已文档化的
+PROVISIONAL 政策面（handoff 回执登记，部署真源走 PRODUCT_REGISTRY_MANIFEST），
+不在本残差范围（见 evidence 记录）。
