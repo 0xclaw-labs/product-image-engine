@@ -40,7 +40,11 @@ func newSourceDownloader(hosts string, test *sourceDownloadDeps) (*sourceDownloa
 	if hosts == "" {
 		return nil, si.ErrUnconfigured
 	}
-	for _, h := range strings.Split(hosts, ",") {
+	// The platform's artifact-host contract is semicolon-separated
+	// (TASK_SOURCE/ARTIFACT_HOSTS runbook shape; HUI-2295 uirun-11). A
+	// semicolon list past a comma split leaves one host string that fails
+	// sourceOSSHost and fail-closes the whole source runtime.
+	for _, h := range strings.Split(hosts, ";") {
 		h = strings.TrimSpace(h)
 		if !sourceOSSHost.MatchString(h) || d.hosts[h] {
 			return nil, si.ErrUnconfigured
