@@ -280,6 +280,10 @@ func (s *Server) showcaseVideoView(job store.ShowcaseVideoJob, idempotent bool) 
 		"charged": false, "billing_passed": false, "production_authorized": false,
 		"pending": job.Pending, "delivery_readiness": showcasevideo.ReadinessInternal,
 		"honesty": showcasevideo.HonestyNotice, "idempotent": idempotent,
+		// MX-OPS: the authoritative queue projection is not wired yet; explicit
+		// null (unknown) beats a guessed ETA. i2v capability stays UNKNOWN.
+		"job_queue_view": nil,
+		"i2v_capability": i2v.Probe(""),
 	}
 }
 
