@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { BILLING_PENDING, CAMERA_MOVES, canStartShowcase, presentShowcaseJob, sameRecord } from "@/lib/showcase-video";
+import { presentShowcaseProduction } from "@/lib/showcase-video-production";
 import { maySubmitShowcase } from "@/components/showcase-video/submit-guard";
 
 type ImageOpt = { id: string; label: string };
@@ -22,6 +23,11 @@ type Job = {
   video_url?: string;
   honesty?: string;
   pending?: string[];
+  job_queue_view?: unknown;
+  i2v_capability?: { status?: string; notice?: string; missing?: string[] } | null;
+  payer_kind?: string;
+  quoted_amount_minor?: number | null;
+  candidate_asset_ref?: string | null;
 };
 
 export function ShowcaseVideoPanel({ projectId, images }: { projectId: string; images: ImageOpt[] }) {
@@ -57,6 +63,7 @@ export function ShowcaseVideoPanel({ projectId, images }: { projectId: string; i
   }
 
   const view = presentShowcaseJob(job ?? {});
+  const production = presentShowcaseProduction(job ?? {});
   const ready = images.some((item) => item.id === imageId) && canStartShowcase(imageId, cameraMove);
   const same = job?.id ? (previousId ? sameRecord(job.id, previousId) : true) : true;
 
@@ -171,6 +178,20 @@ export function ShowcaseVideoPanel({ projectId, images }: { projectId: string; i
       {job?.id ? <p>记录 {job.id}</p> : null}
       {!same ? <p>刷新后的记录编号变了，请不要把它当成同一次请求。</p> : null}
       {notice ? <p>{notice}</p> : null}
+      <section data-showcase-production="true">
+        <p data-field="capability">{production.capabilityNotice}</p>
+        <p data-field="waiting">{production.waitingText}</p>
+        {production.queue ? (
+          <p data-field="queue">
+            {production.queue.queueKindLabel} · {production.queue.phaseLabel} · 前面共 {production.queue.jobsAhead} 个任务（含运行中）
+            {" · "}等待 {production.queue.waitingJobsAheadText} · 运行中 {production.queue.runningJobsText}
+            {production.queue.nextEligibleText ? ` · 下一可执行窗口 ${production.queue.nextEligibleText}` : ""}
+          </p>
+        ) : null}
+        <p data-field="cost">{production.costBearing} · {production.quoteText}</p>
+        <p data-field="candidate">{production.candidate.hint}</p>
+        <p data-field="recovery">{production.notice}</p>
+      </section>
       <p className="muted">{job?.honesty || "没有真实展示视频，不能播放静图或假视频"}</p>
       <p className="muted">{(job?.pending ?? []).join("；")}</p>
     </Card>
