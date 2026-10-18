@@ -6,6 +6,7 @@
 - Base: `57390e64`（origin/main）
 - Head: 本分支最新 commit（PR 记录）
 - Worktree: `.worktrees/mx-ops-1702-product-image-engine`
+- PR: [#68](https://github.com/0xclaw-labs/product-image-engine/pull/68)（OPEN，不合并/不部署）
 - Contract: `mx-ops-c0/v1 @ 6ffc90ca`（`docs/mx-ops/1702/contract-version.md`；无 additive）
 
 ## Scope done（逐条对工单 2026-10-18 MX-OPS 增量）
