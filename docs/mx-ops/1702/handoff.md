@@ -27,8 +27,9 @@
 
 ## Code review
 
-- Standards: 待补。
-- Spec: 待补。
+- Standards: PASS（gofmt 干净；沿用仓内既有 map-view/源码契约测试惯例；合同类型原样副本）。
+  Judgement notes：①`i2v` 只定义接缝、不实现 provider（符合「无 adapter 不伪造」）；②任务视图新增 `job_queue_view:null`/`i2v_capability` 是显式未知而非猜测；③同形内核为独立部署副本。
+- Spec: PASS（I2V UNKNOWN + 缺 Adapter 接缝、队列/等待/费用/候选、无 T2V 冒充均有实现与测试）；缺口：真实 I2V/GPU/账务未跑（UNKNOWN），队列投影真实上游未接（显式 null）。
 
 ## Blocked / UNKNOWN
 
