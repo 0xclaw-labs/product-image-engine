@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/bianjiefilm/product-image-engine/server/internal/i2v"
 	"github.com/bianjiefilm/product-image-engine/server/internal/showcasevideo"
 	"github.com/bianjiefilm/product-image-engine/server/internal/store"
 )
@@ -24,6 +25,9 @@ func (s *Server) handleShowcaseVideoCapabilities(w http.ResponseWriter, r *http.
 		"video_url":             "",
 		"delivery_readiness":    showcasevideo.ReadinessInternal,
 		"honesty":               showcasevideo.HonestyNotice,
+		// HUI-1702 MX-OPS: no usable image-conditioned video adapter today.
+		// UNKNOWN is explicit; T2V is never substituted.
+		"i2v_capability": i2v.Probe(""),
 	})
 }
 
@@ -276,6 +280,10 @@ func (s *Server) showcaseVideoView(job store.ShowcaseVideoJob, idempotent bool) 
 		"charged": false, "billing_passed": false, "production_authorized": false,
 		"pending": job.Pending, "delivery_readiness": showcasevideo.ReadinessInternal,
 		"honesty": showcasevideo.HonestyNotice, "idempotent": idempotent,
+		// MX-OPS: the authoritative queue projection is not wired yet; explicit
+		// null (unknown) beats a guessed ETA. i2v capability stays UNKNOWN.
+		"job_queue_view": nil,
+		"i2v_capability": i2v.Probe(""),
 	}
 }
 
