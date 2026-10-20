@@ -35,6 +35,7 @@ export interface SourceImageAPI {
   reconcile(project: string, run: string): Promise<SourceRunView>;
   cancel(project: string, run: string): Promise<SourceRunView>;
   select(project: string, run: string): Promise<SourceRunView>;
+  adopt(project: string, run: string): Promise<SourceRunView>;
   deleteOutput(project: string, run: string): Promise<SourceRunView>;
   returnOutput(project: string, run: string): Promise<{ output_id: string }>;
 }
@@ -186,7 +187,13 @@ export function validBackground(v: string): boolean { return v.length>0 && v ===
 export const pendingHintKey = (s: SourceScope, mode: SourceModeName="text_generate"): string => (mode === "text_generate" ? "source-image-pending:" : "plate-lock-pending:") + JSON.stringify([s.userID,s.accountID,s.projectID]);
 export function pickRecoveredRun(runs: SourceRunView[], mode: SourceModeName): SourceRunView | null {
   const open = runs.filter(r => r.mode === mode && !r.deleted && !r.cancel_requested);
-  return open.find(r => r.confirmed) ?? open[0] ?? null;
+  // Server lists newest first. Prefer the newest request that is still in
+  // flight after payment (leave-and-return must resume that one), then the
+  // newest paid request, then the newest record of any phase.
+  const inFlight = open.find(r => r.confirmed && (r.mode === "text_generate" ? !r.output : r.plate?.derivation_state === "pending"));
+  if (inFlight) return inFlight;
+  const paid = open.find(r => r.confirmed);
+  return paid ?? open[0] ?? null;
 }
 export function sourcePath(project: string, run?: string, action?: "content" | "export" | "return"): string {
   if(!sourceSegment(project) || run !== undefined && !sourceSegment(run)) throw new Error("invalid_source_path");
@@ -210,6 +217,7 @@ export const sourceImageAPI: SourceImageAPI = {
   reconcile:async(p,r)=>decodeSourceRun(await sourceFetch(sourcePath(p,r)+"/reconcile","POST",{})),
   cancel:async(p,r)=>decodeSourceRun(await sourceFetch(sourcePath(p,r)+"/cancel","POST",{})),
   select:async(p,r)=>decodeSourceRun(await sourceFetch(sourcePath(p,r)+"/select","POST",{})),
+  adopt:async(p,r)=>decodeSourceRun(await sourceFetch(sourcePath(p,r)+"/adopt","POST",{})),
   deleteOutput:async(p,r)=>decodeSourceRun(await sourceFetch(sourcePath(p,r)+"/output","DELETE",{})),
   returnOutput:async(p,r)=>{ const d=object(await sourceFetch(sourcePath(p,r)+"/return","POST",{})); const o=object(d.output); return { output_id:id(o.id) }; },
 };
@@ -275,7 +283,7 @@ export class SourceImageController {
     if(v.userID !== s.userID || v.accountID !== s.accountID || v.projectID !== s.projectID || !sourceSegment(v.requestKey)) return;
     this.pending={hint:{...s,requestKey:v.requestKey},input:null,attempted:true}; const r=await this.api.find(s.projectID,v.requestKey); if(epoch !== this.epoch) throw new Error("登录范围已改变"); if(r) {if(r.request_key !== v.requestKey) throw new Error("原请求键不一致");this.remember(r,epoch);}
   }
-  action(name: "reconcile" | "cancel" | "select" | "deleteOutput"): Promise<void> { return this.coalesce(async()=>{ const s=this.current(), epoch=this.epoch, v=this.view; if(!v || sourceWritesDenied(this.capabilities,v.mode)) throw new Error("当前工程不允许写操作"); this.rememberOriginal(await this.api[name](s.projectID,v.run_id),v,epoch); }); }
+  action(name: "reconcile" | "cancel" | "select" | "adopt" | "deleteOutput"): Promise<void> { return this.coalesce(async()=>{ const s=this.current(), epoch=this.epoch, v=this.view; if(!v || sourceWritesDenied(this.capabilities,v.mode)) throw new Error("当前工程不允许写操作"); this.rememberOriginal(await this.api[name](s.projectID,v.run_id),v,epoch); }); }
   // Registers the selected, limited-candidate composite for return to an order or
   // campaign. The server re-checks quality, selection and the original charge.
   async returnToSource(): Promise<string> { let outputID=""; await this.coalesce(async()=>{ const s=this.current(), v=this.view; if(!v || v.mode !== "background_plate_lock" || sourceWritesDenied(this.capabilities,v.mode) || !v.selected || v.plate?.candidate_state !== "limited_candidate") throw new Error("只有已选定的限定候选才能回传"); outputID=(await this.api.returnOutput(s.projectID,v.run_id)).output_id; }); return outputID; }

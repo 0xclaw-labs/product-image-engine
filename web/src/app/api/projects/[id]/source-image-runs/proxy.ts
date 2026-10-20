@@ -71,7 +71,7 @@ export async function sourceProxy(req: Request, p: { id: string; runId?: string;
   try {
     const url=new URL(req.url);
     if(!sourceSegment(p.id) || p.runId !== undefined && (!sourceSegment(p.runId) || !p.runId.startsWith("sir_"))) reject(400,"invalid_request");
-    const actionMethods: Record<string,string>={confirm:"POST",reconcile:"POST",cancel:"POST",select:"POST",return:"POST",output:"DELETE",content:"GET",export:"GET"};
+    const actionMethods: Record<string,string>={confirm:"POST",reconcile:"POST",cancel:"POST",select:"POST",adopt:"POST",return:"POST",output:"DELETE",content:"GET",export:"GET"};
     const allowed=resource === "list" ? ["GET","POST"] : resource === "action" ? [actionMethods[p.action ?? ""]].filter(Boolean) : ["GET"];
     if(resource === "action" && !Object.hasOwn(actionMethods,p.action ?? "")) reject(404,"not_found");
     if(!allowed.includes(req.method)) reject(405,"method_not_allowed");

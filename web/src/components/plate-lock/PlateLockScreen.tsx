@@ -7,10 +7,11 @@ import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/ca
 import { Field } from "@/components/ui/field";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Stepper } from "@/components/ui/stepper";
+import { Stage } from "@/components/workspace/Stage";
 import styles from "@/components/ui/ui.module.css";
 import { canConfirm, formatMinor, sourcePath } from "@/lib/source-image";
 import type { PlateAxisState, SourceCapabilities, SourceRunView } from "@/lib/source-image";
-import { NO_USABLE_PHOTO, PLATE_PROMISE, PLATE_SCOPE_NOTE, PLATE_TITLE, PRICING_NOTE, RETURN_NOTE, STEPS, axisLabel, candidateSummary, canExportPlate, canReturnPlate, canSelectPlate, charged, failedAxes, plate, plateStatusLine, reasonText, stageOf, stateLabel } from "@/lib/plate-lock";
+import { NO_USABLE_PHOTO, PLATE_PROMISE, PLATE_SCOPE_NOTE, PLATE_TITLE, PRICING_NOTE, RETURN_NOTE, STEPS, axisLabel, candidateSummary, canExportPlate, canReturnPlate, canSelectPlate, charged, chooseSupportedInput, failedAxes, plate, plateStatusLine, reasonText, stageOf, stateLabel } from "@/lib/plate-lock";
 
 export type PlateScreenProps = {
   view: SourceRunView | null; capabilities: SourceCapabilities | null; nowUnix: number; projectID: string;
@@ -18,7 +19,7 @@ export type PlateScreenProps = {
   returnEnabled?: boolean; returnAck?: boolean; returnNotice?: string; uploadSlot?: ReactNode;
   materialsSlot?: ReactNode; railSlot?: ReactNode;
   onBackground?: (v: string) => void; onInput?: (id: string) => void; onQuote?: () => void; onConfirm?: () => void; onRefresh?: () => void;
-  onSelect?: () => void; onReturn?: () => void; onReturnAck?: (v: boolean) => void; onNew?: () => void;
+  onSelect?: () => void; onAdopt?: () => void; onReturn?: () => void; onReturnAck?: (v: boolean) => void; onNew?: () => void;
 };
 
 const KIND_LABEL: Record<string, string> = { carton: "纸盒", handled_metal: "金属把手杯", glass_bottle: "玻璃瓶" };
@@ -30,7 +31,7 @@ export function PlateLockScreen(p: PlateScreenProps) {
   const v = p.view, pl = plate(v), q = v?.quote;
   const supported = mode?.supported_inputs ?? [];
   const ready = mode?.ready === true;
-  const chosen = supported.find(i => i.input_id === p.inputId) ?? supported[0];
+  const chosen = chooseSupportedInput(supported, p.inputId);
   const hasPhoto = supported.length > 0;
   const bg = (p.background ?? "").trim();
   const pay = !!v && mode?.can_confirm === true && canConfirm(v, p.nowUnix);
@@ -49,10 +50,11 @@ export function PlateLockScreen(p: PlateScreenProps) {
     if (el) { el.focus(); focusedQuote.current = quoteId; }
   }, [pay, p.busy, quoteId]);
   const resultReady = !!(pl && summary && pl.derivation_state !== "pending");
+  const noticeIsSuccess = !!p.notice && /^(已采用|已清空|已登记|已回传)/.test(p.notice.trim());
   return (
-    <Card data-plate-entry="true" data-mode="background_plate_lock" data-ready={ready ? "true" : "false"} aria-labelledby="plate-title" aria-busy={p.busy || p.loading ? "true" : "false"}>
-      <div className={styles.bench}>
-        <div className={styles.benchMaterials}>
+    <Card data-plate-entry="true" data-mode="background_plate_lock" data-ready={ready ? "true" : "false"} data-run-phase={v?.phase ?? ""} data-plate-state={pl?.derivation_state ?? "none"} data-candidate-state={pl?.candidate_state ?? ""} aria-labelledby="plate-title" aria-busy={p.busy || p.loading ? "true" : "false"}>
+      <div className={styles.bench} data-has-artwork={contentSrc ? "true" : "false"}>
+        <div className={styles.benchMaterials} data-workspace-rail="materials" data-region="next_steps">
           <CardHeader>
             <CardTitle>{PLATE_TITLE}</CardTitle>
             <CardDescription>{PLATE_PROMISE}{PLATE_SCOPE_NOTE}</CardDescription>
@@ -81,7 +83,7 @@ export function PlateLockScreen(p: PlateScreenProps) {
             </form>
           ) : null}
         </div>
-        <div className={styles.benchStage}>
+        <div className={styles.benchStage} data-workspace-rail="stage" data-region="current_work">
           {v ? (
             <section aria-label="报价与费用" data-testid="plate-quote">
               {q ? <p>报价 <strong>{formatMinor(q.amount_minor)}</strong> · 付款人：{v.payment.payer_label} · 有效至 {expiry(q.expires_at_unix)}</p> : <p>报价待核实。</p>}
@@ -91,36 +93,54 @@ export function PlateLockScreen(p: PlateScreenProps) {
               {charged(v) ? <p>已扣费 {formatMinor(v.payment.original_charged_minor ?? v.payment.charged_minor)}。</p> : null}
             </section>
           ) : null}
-          {contentSrc ? (
-            <figure>
-              <img className={styles.resultImg} alt={pl?.candidate_state === "limited_candidate" ? "换背景后的商品图" : "换背景后的商品图（未通过检查，不可使用）"} src={contentSrc} width={pl?.canvas?.width_px} height={pl?.canvas?.height_px} />
-              <figcaption>
-                <span className={styles.stageMeta}>
-                  <span className={styles.chip}>主体保真 {summary?.label ?? "待确认"}</span>
-                  <span className={styles.chip}>{v?.selected ? "已选定" : "尚未选定"}</span>
-                  <span className={styles.chip}>{pl?.canvas?.width_px}×{pl?.canvas?.height_px}</span>
-                </span>
-              </figcaption>
-            </figure>
-          ) : (
-            <div className={styles.stageEmpty}>
-              <p>{p.loading ? "正在读取……" : v && v.confirmed && pl?.derivation_state === "pending" ? "正在生成背景并检查商品……" : "结果会显示在这里。选照片、写背景、确认费用，步骤没有增加。"}</p>
-            </div>
-          )}
+          <Stage
+            id="plate-compare"
+            pattern="compare"
+            original={chosen ? {
+              src: `/api/projects/${encodeURIComponent(p.projectID)}/inputs/${encodeURIComponent(chosen.input_id)}/content`,
+              alt: `商品原图：${KIND_LABEL[chosen.kind] ?? "样本"}`,
+              label: "原图",
+              width: chosen.canvas.width_px,
+              height: chosen.canvas.height_px,
+              note: "原图只做对照，不会被候选覆盖",
+            } : null}
+            candidate={contentSrc ? {
+              src: contentSrc,
+              alt: pl?.candidate_state === "limited_candidate" ? "换背景后的商品图" : "换背景后的商品图（未通过检查，不可使用）",
+              label: pl?.candidate_state === "limited_candidate" ? "候选（限定范围，未采用）" : "候选（未通过检查，不可使用）",
+              width: pl?.canvas?.width_px,
+              height: pl?.canvas?.height_px,
+              note: summary?.label ?? "检查尚未完成",
+            } : null}
+            candidateBadge={p.loading ? "正在读取" : v && v.confirmed && pl?.derivation_state === "pending" ? "正在生成并检查" : summary?.label}
+            candidateTone={summary?.tone ?? "warn"}
+            selected={!!v?.selected}
+            empty={<p>{p.loading ? "正在读取……" : v && v.confirmed && pl?.derivation_state === "pending" ? "正在生成背景并检查商品……离开页面不会重复扣费；回来会继续读取同一请求。" : "结果会显示在这里。选照片、写背景、确认费用，步骤没有增加。"}</p>}
+          />
           {resultReady ? (
-            <section aria-label="结果与商品检查" data-testid="plate-result" data-candidate={pl!.candidate_state}>
+            <section aria-label="结果与商品检查" data-testid="plate-result" data-candidate={pl!.candidate_state} data-page-pattern="review" data-region="subject_preview">
               <Alert tone={summary!.tone === "ok" ? "ok" : summary!.tone === "bad" ? "danger" : "warn"} title={summary!.label}>{summary!.detail}</Alert>
               {failed.length > 0 ? <Alert tone="danger" title="没有通过的检查">{failed.map(a => axisLabel(a.name)).join("、")}</Alert> : null}
-              <div className={styles.actions}>
+              <div className={styles.actions} data-region="decision_controls">
                 <Button type="button" disabled={!!p.busy || !canSelectPlate(v!)} onClick={p.onSelect} data-testid="plate-select">{v!.selected ? "已选定" : "选定这张"}</Button>
+                {summary!.tone === "ok" ? (
+                  <Button type="button" variant="secondary" disabled={!!p.busy || !v!.selected} onClick={p.onAdopt} data-testid="plate-adopt" title={v!.selected ? "把当前版本指针移到这张图" : "先选定候选，再采用"}>
+                    采用为当前版本
+                  </Button>
+                ) : null}
                 {canExportPlate(v!) ? <a className={styles.link} href={sourcePath(p.projectID, v!.run_id, "export")} data-testid="plate-export">导出图片与检查报告</a> : <span aria-disabled="true">导出不可用</span>}
-                {pl!.candidate_state === "limited_candidate" ? <a className={styles.link} href="#compare">并排比较</a> : null}
+                {pl!.candidate_state === "limited_candidate" ? <a className={styles.link} href="#plate-compare">并排比较</a> : null}
                 {pl!.candidate_state === "limited_candidate" ? <a className={styles.link} href="#revision">只改这里</a> : null}
               </div>
+              {summary!.tone === "ok" ? (
+                <p className={styles.desc} data-testid="plate-adopt-note">
+                  选定只是候选；采用才会把当前版本指针移到这张图。采用后可在版本区回退，已采用版本才会进导出与回传。
+                </p>
+              ) : null}
             </section>
           ) : null}
         </div>
-        <div className={styles.benchRail}>
+        <div className={styles.benchRail} data-workspace-rail="inspector" data-region="evidence_context">
           {p.railSlot}
           {resultReady ? (
             <>
@@ -152,7 +172,7 @@ export function PlateLockScreen(p: PlateScreenProps) {
               ) : null}
             </>
           ) : null}
-          {p.notice ? <Alert tone="danger" title="没有完成" data-testid="plate-notice">{p.notice}</Alert> : null}
+          {p.notice ? <Alert tone={noticeIsSuccess ? "ok" : "danger"} title={noticeIsSuccess ? "已完成" : "没有完成"} data-testid="plate-notice">{p.notice}</Alert> : null}
           <div className={styles.actions}>
             {v ? <Button type="button" variant="outline" disabled={!!p.busy} onClick={p.onRefresh}>刷新状态</Button> : null}
             {v ? <Button type="button" variant="outline" disabled={!!p.busy} onClick={p.onNew}>换个背景再试（重新报价）</Button> : null}

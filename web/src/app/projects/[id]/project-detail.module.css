@@ -100,3 +100,19 @@
 .factDl dd {
   margin: 0;
 }
+
+/* Advanced/closed modes live behind an explicit disclosure, not a wall. */
+.more {
+  margin-top: var(--pn-spacing-4);
+  border: var(--pn-border-width-hairline) solid var(--pn-border-default);
+  border-radius: var(--pn-radius-card);
+  background: var(--pn-bg-surface);
+  padding: var(--pn-spacing-3);
+}
+.more > summary {
+  cursor: pointer;
+  color: var(--pn-text-secondary);
+}
+.more > summary:hover {
+  color: var(--pn-text-primary);
+}
