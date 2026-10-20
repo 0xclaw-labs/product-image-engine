@@ -1,0 +1,224 @@
+
+> product-image-web@0.1.0 gate:shell
+> node scripts/tokens/verify-painuo-tokens.mjs && node scripts/gates/token-contrast.mjs && node scripts/gates/keyboard-touch.mjs
+
+{
+  "ok": true,
+  "consumerId": "product-image-web",
+  "tokenVersion": "1.0.0",
+  "sourceCommit": "58a2b760842b33449785016a5257979c21aeab86",
+  "sourceCanonicalSha256": "89ddf356439b8c7997884fc0a2d8066089570f441bb993f248c2d4ebf6c87d72",
+  "files": 7,
+  "contrastRows": 99
+}
+{
+  "ok": true,
+  "surface": "work.light",
+  "theme": "dark",
+  "tokenVersion": "1.0.0",
+  "sourceCanonicalSha256": "89ddf356439b8c7997884fc0a2d8066089570f441bb993f248c2d4ebf6c87d72",
+  "pairs": [
+    {
+      "fg": "--pn-text-primary",
+      "bg": "--pn-bg-page",
+      "usage": "body on page",
+      "min": 4.5,
+      "ratio": 14.432,
+      "pass": true
+    },
+    {
+      "fg": "--pn-text-primary",
+      "bg": "--pn-bg-surface",
+      "usage": "body on card",
+      "min": 4.5,
+      "ratio": 13.085,
+      "pass": true
+    },
+    {
+      "fg": "--pn-text-primary",
+      "bg": "--pn-bg-raised",
+      "usage": "body on raised control",
+      "min": 4.5,
+      "ratio": 11.562,
+      "pass": true
+    },
+    {
+      "fg": "--pn-text-primary",
+      "bg": "--pn-bg-canvas",
+      "usage": "body on stage",
+      "min": 4.5,
+      "ratio": 15.113,
+      "pass": true
+    },
+    {
+      "fg": "--pn-text-secondary",
+      "bg": "--pn-bg-page",
+      "usage": "label on page",
+      "min": 4.5,
+      "ratio": 9.423,
+      "pass": true
+    },
+    {
+      "fg": "--pn-text-secondary",
+      "bg": "--pn-bg-surface",
+      "usage": "label on card",
+      "min": 4.5,
+      "ratio": 8.544,
+      "pass": true
+    },
+    {
+      "fg": "--pn-text-secondary",
+      "bg": "--pn-bg-raised",
+      "usage": "label on raised",
+      "min": 4.5,
+      "ratio": 7.549,
+      "pass": true
+    },
+    {
+      "fg": "--pn-text-muted",
+      "bg": "--pn-bg-page",
+      "usage": "muted on page",
+      "min": 4.5,
+      "ratio": 7.901,
+      "pass": true
+    },
+    {
+      "fg": "--pn-text-muted",
+      "bg": "--pn-bg-surface",
+      "usage": "muted on card",
+      "min": 4.5,
+      "ratio": 7.163,
+      "pass": true
+    },
+    {
+      "fg": "--pn-text-muted",
+      "bg": "--pn-bg-raised",
+      "usage": "muted on raised",
+      "min": 4.5,
+      "ratio": 6.33,
+      "pass": true
+    },
+    {
+      "fg": "--pn-brand-text",
+      "bg": "--pn-bg-page",
+      "usage": "link on page",
+      "min": 4.5,
+      "ratio": 10.214,
+      "pass": true
+    },
+    {
+      "fg": "--pn-brand-text",
+      "bg": "--pn-bg-surface",
+      "usage": "link on card",
+      "min": 4.5,
+      "ratio": 9.261,
+      "pass": true
+    },
+    {
+      "fg": "--pn-brand-text",
+      "bg": "--pn-bg-raised",
+      "usage": "link on raised",
+      "min": 4.5,
+      "ratio": 8.183,
+      "pass": true
+    },
+    {
+      "fg": "--pn-brand-ink",
+      "bg": "--pn-brand-accent",
+      "usage": "primary button text",
+      "min": 4.5,
+      "ratio": 5.741,
+      "pass": true
+    },
+    {
+      "fg": "--pn-brand-ink",
+      "bg": "--pn-brand-hover",
+      "usage": "primary button hover",
+      "min": 4.5,
+      "ratio": 6.93,
+      "pass": true
+    },
+    {
+      "fg": "--pn-status-success-fg",
+      "bg": "--pn-status-success-weak",
+      "usage": "success chip",
+      "min": 4.5,
+      "ratio": 8.225,
+      "pass": true
+    },
+    {
+      "fg": "--pn-status-danger-fg",
+      "bg": "--pn-status-danger-weak",
+      "usage": "danger banner",
+      "min": 4.5,
+      "ratio": 7.662,
+      "pass": true
+    },
+    {
+      "fg": "--pn-status-warning-fg",
+      "bg": "--pn-status-warning-weak",
+      "usage": "warning banner",
+      "min": 4.5,
+      "ratio": 9.276,
+      "pass": true
+    },
+    {
+      "fg": "--pn-status-info-fg",
+      "bg": "--pn-status-info-weak",
+      "usage": "info banner",
+      "min": 4.5,
+      "ratio": 7.789,
+      "pass": true
+    },
+    {
+      "fg": "--pn-border-focus",
+      "bg": "--pn-bg-page",
+      "usage": "focus ring on page",
+      "min": 3,
+      "ratio": 8.362,
+      "pass": true
+    },
+    {
+      "fg": "--pn-border-focus",
+      "bg": "--pn-bg-surface",
+      "usage": "focus ring on card",
+      "min": 3,
+      "ratio": 7.582,
+      "pass": true
+    },
+    {
+      "fg": "--pn-border-focus",
+      "bg": "--pn-bg-canvas",
+      "usage": "focus ring on stage",
+      "min": 3,
+      "ratio": 8.757,
+      "pass": true
+    },
+    {
+      "fg": "--pn-border-strong",
+      "bg": "--pn-bg-surface",
+      "usage": "control border",
+      "min": 3,
+      "ratio": 4.656,
+      "pass": true
+    },
+    {
+      "fg": "--pn-text-inverse",
+      "bg": "--pn-brand-accent",
+      "usage": "inverse on accent",
+      "min": 4.5,
+      "ratio": 5.541,
+      "pass": true
+    }
+  ],
+  "producerObligations": 99,
+  "producerFailures": 0,
+  "failures": 0
+}
+{
+  "ok": true,
+  "checkedFiles": 8,
+  "failureCount": 0,
+  "failures": [],
+  "browserGate": "e2e/pimage-shell.mjs (run separately against the fixture stack; labelled fixture)"
+}
