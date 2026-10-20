@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import styles from "@/components/ui/ui.module.css";
 
 export type StartScreenProps = {
   title: string;
@@ -31,6 +32,7 @@ export function StartScreen(props: StartScreenProps) {
   if (props.compact) {
     return (
       <Card
+        data-page-pattern="creation"
         data-entry-screen="start"
         data-catalog={props.showsCatalog ? "true" : "false"}
         data-scope={props.scope}
@@ -41,16 +43,18 @@ export function StartScreen(props: StartScreenProps) {
         data-upload-required={props.uploadRequired ? "true" : "false"}
         data-quote={props.quoteLabel}
       >
-        <CardHeader>
-          <CardTitle>{props.title}</CardTitle>
+        <header data-region="header">
+          <h1 className={styles.title} data-testid="start-title">{props.title}</h1>
           <CardDescription>选一张商品照片，写下想要的背景，确认费用后生成。商品本身不会被改动。</CardDescription>
-        </CardHeader>
-        {props.children}
+        </header>
+        <p className="muted" data-region="progress_context">选照片 → 写背景 → 确认费用 → 生成 → 查看结果</p>
+        <div data-region="input_sections">{props.children}</div>
       </Card>
     );
   }
   return (
     <Card
+      data-page-pattern="creation"
       data-entry-screen="start"
       data-catalog={props.showsCatalog ? "true" : "false"}
       data-scope={props.scope}
@@ -62,7 +66,7 @@ export function StartScreen(props: StartScreenProps) {
       data-quote={props.quoteLabel}
     >
       <div className="media-bench">
-        <section className="media-materials" aria-label="素材与简报">
+        <section className="media-materials" aria-label="素材与简报" data-region="input_sections">
           <CardHeader>
             <CardTitle>{props.title}</CardTitle>
             <CardDescription>
@@ -94,7 +98,7 @@ export function StartScreen(props: StartScreenProps) {
             </Button>
           )}
         </section>
-        <section className="media-stage" aria-label="候选">
+        <section className="media-stage" aria-label="候选" data-region="media_preview">
           <div className="stage-empty">
             <p className="stage-kicker">候选</p>
             <p data-fidelity={props.fidelityLabel}>主体保真 {props.fidelityLabel}</p>
@@ -102,7 +106,7 @@ export function StartScreen(props: StartScreenProps) {
             {props.showImage && props.outputAssetId ? <p>候选引用 {props.outputAssetId}</p> : <p>结果会显示在这里。还没有成片时，不会用别的图代替。</p>}
           </div>
         </section>
-        <aside className="media-rail" aria-label="费用与下一步">
+        <aside className="media-rail" aria-label="费用与下一步" data-region="review_summary">
           {props.children}
         </aside>
       </div>

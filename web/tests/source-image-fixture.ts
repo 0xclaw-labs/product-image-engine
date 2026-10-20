@@ -28,7 +28,8 @@ export function sourceAPIFixture(calls: string[]): SourceImageAPI {
     find: async (_project, key) => { calls.push("find:" + key); return quoted(); },
     reconcile: async () => { calls.push("reconcile"); return quoted(); },
     cancel: async () => { calls.push("cancel"); return { ...quoted(), phase: "not_dispatched", cancel_requested: true }; },
-    select: async () => { calls.push("select"); return quoted(); },
+    select: async () => { calls.push("select"); return { ...quoted(), selected: true }; },
+    adopt: async () => { calls.push("adopt"); return { ...quoted(), selected: true }; },
     deleteOutput: async () => { calls.push("deleteOutput"); return { ...quoted(), deleted: true, output: null }; },
     returnOutput: async () => { calls.push("returnOutput"); return { output_id: "out_a" }; },
   };

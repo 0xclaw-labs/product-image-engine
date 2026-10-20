@@ -5,6 +5,7 @@ import { PlateLockScreen } from "@/components/plate-lock/PlateLockScreen";
 import type { PlateScreenProps } from "@/components/plate-lock/PlateLockScreen";
 import { TECHNICAL_ONLY_TERMS } from "@/lib/plate-lock";
 import { plateCapabilities, plateDone, plateQuoted } from "./source-image-fixture";
+import { chooseSupportedInput } from "@/lib/plate-lock";
 
 const base: PlateScreenProps = { view: null, capabilities: plateCapabilities(true), nowUnix: 1700000100, projectID: "proj_a", background: "" };
 const html = (p: Partial<PlateScreenProps>) => renderToStaticMarkup(createElement(PlateLockScreen, { ...base, ...p }));
@@ -12,6 +13,18 @@ const html = (p: Partial<PlateScreenProps>) => renderToStaticMarkup(createElemen
 const primary = (markup: string) => markup.replace(/<details data-technical="true">[\s\S]*?<\/details>/g, "");
 // What a person reads: tags and attributes (class names, image URLs) are not text.
 const visible = (markup: string) => primary(markup).replace(/<[^>]*>/g, " ");
+
+describe("limited-fidelity input identity", () => {
+  it("uses the explicitly attached input instead of silently quoting the first supported photo", () => {
+    const supported = [
+      { input_id: "pin_old", kind: "carton", canvas: { width_px: 1024, height_px: 1024 } },
+      { input_id: "pin_new", kind: "handled_metal", canvas: { width_px: 1024, height_px: 1280 } },
+    ];
+    expect(chooseSupportedInput(supported, "pin_new")?.input_id).toBe("pin_new");
+    expect(chooseSupportedInput(supported, "")?.input_id).toBe("pin_old");
+    expect(chooseSupportedInput(supported, "pin_missing")?.input_id).toBe("pin_old");
+  });
+});
 
 describe("limited-fidelity screen states", () => {
   it("loading state shows a polite status and skeletons, no form", () => {
@@ -49,6 +62,25 @@ describe("limited-fidelity screen states", () => {
     expect(m).toContain("不会自动重做，也不会再次扣费");
     expect(m).toMatch(/<button[^>]*disabled=""[^>]*>获取报价/);
     expect(html({ background: "深蓝色背景" })).not.toMatch(/<button[^>]*disabled=""[^>]*>获取报价/);
+  });
+
+  it("a successful adopt notice is not dressed as a failure", () => {
+    const m = html({ view: { ...plateDone(), selected: true }, notice: "已采用为当前版本。版本区可以回退。" });
+    expect(m).toMatch(/data-testid="plate-notice"[^>]*data-tone="ok"|data-tone="ok"[^>]*data-testid="plate-notice"/);
+    expect(m).toContain("已完成");
+    expect(m).not.toContain("没有完成");
+  });
+
+  it("selected candidate exposes a separate adopt action; an unusable candidate never does", () => {
+    const selected = { ...plateDone(), selected: true };
+    const m = html({ view: selected });
+    expect(m).toMatch(/<button[^>]*data-testid="plate-adopt"[^>]*>采用为当前版本/);
+    expect(m).not.toMatch(/<button[^>]*disabled=""[^>]*data-testid="plate-adopt"/);
+    expect(m).toContain("选定只是候选；采用才会把当前版本指针移到这张图");
+    const unselected = html({ view: plateDone() });
+    expect(unselected).toMatch(/<button[^>]*disabled=""[^>]*data-testid="plate-adopt"/);
+    const bad = html({ view: plateDone("not_usable_candidate") });
+    expect(bad).not.toContain("plate-adopt");
   });
 
   it("quoted state shows the amount, payer and one confirm button, with the honest cost sentence", () => {

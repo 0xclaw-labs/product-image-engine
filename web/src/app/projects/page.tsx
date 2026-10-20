@@ -98,10 +98,10 @@ export default function ProjectsPage() {
   }
 
   return (
-    <div className="list-workspace" data-layout="list">
-      <div className="card">
+    <div className="list-workspace" data-layout="list" data-page-pattern="list">
+      <div className="card" data-region="header">
         <div className="row row-center">
-          <h2 className="row-title">我的制作工程</h2>
+          <h1 className="row-title card-heading">我的制作工程</h1>
           <Link className="link" href="/start">开始做产品图</Link>
           <Link className="link" href="/batches">批量</Link>
           <Link className="link" href="/handoff">
@@ -193,7 +193,7 @@ export default function ProjectsPage() {
         ) : null}
       </div>
 
-      <div className="card">
+      <div className="card" data-region="collection">
         {projects === null ? (
           <span className="muted" data-state="loading">加载中…</span>
         ) : projects.length === 0 ? (

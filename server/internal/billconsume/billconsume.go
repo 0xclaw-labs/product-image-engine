@@ -100,6 +100,10 @@ type Handoff struct {
 	ReturnTarget    string `json:"return_target"`
 	QuoteRef        string `json:"quote_ref"`
 	GenerateAllowed bool   `json:"generate_allowed"`
+	// BillingCenterURL is the operator-configured public Billing Center entry.
+	// Empty means this deployment has no registered entry: the UI must explain
+	// that fact instead of linking a guessed/relative route.
+	BillingCenterURL string `json:"billing_center_url,omitempty"`
 }
 
 // PageDecision 是从充值页返回后的判定。

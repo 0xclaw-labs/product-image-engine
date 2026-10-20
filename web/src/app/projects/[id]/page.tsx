@@ -18,6 +18,7 @@ import { RecoveryStrip } from "@/components/recovery/RecoveryStrip";
 import { MotionRefNote } from "@/components/motion-ref/MotionRefNote";
 import { RevisionRail } from "@/components/revision/RevisionRail";
 import { SourceImagePanel } from "@/components/source-image/Panel";
+import { WorkspaceShell } from "@/components/workspace/WorkspaceShell";
 import { MatrixDraftPanel } from "@/components/matrix-draft/Panel";
 
 interface Project {
@@ -354,6 +355,7 @@ export default function ProjectDetailPage() {
   const [photoBusy, setPhotoBusy] = useState(false);
   // Bumped whenever a photo is attached so the plate-lock panel re-reads which inputs it supports.
   const [plateReload, setPlateReload] = useState(0);
+  const [preferredInputId, setPreferredInputId] = useState("");
 
   async function uploadPhoto(e: React.FormEvent) {
     e.preventDefault();
@@ -397,6 +399,7 @@ export default function ProjectDetailPage() {
         upData?.idempotent ? "同内容已存在(幂等),引用已挂接" : "上传成功,已挂接到工程"
       );
       setPhotoFile(null);
+      if (typeof attachData?.input?.id === "string") setPreferredInputId(attachData.input.id);
       await load();
       setPlateReload((k) => k + 1);
     } finally {
@@ -628,12 +631,7 @@ export default function ProjectDetailPage() {
   const benchMaterials = (
     <>
       <div className="card">
-        <div className="row row-center">
-          <h2 className="row-title">{project.name}</h2>
-          <Link className="link" href="/projects">
-            ← 返回工程列表
-          </Link>
-        </div>
+        <h2>简报</h2>
         <p className="muted mt-4">
           来源:
           {project.source_type ? (
@@ -647,10 +645,6 @@ export default function ProjectDetailPage() {
             "独立制作(无来源,不影响任何功能)"
           )}
         </p>
-      </div>
-
-      <div className="card">
-        <h2>简报</h2>
         <form onSubmit={save}>
           <div className={styles.briefBar}>
             <dl className={styles.factDl}>
@@ -858,24 +852,44 @@ export default function ProjectDetailPage() {
   );
 
   return (
-    <div className={styles.shell}>
+    <WorkspaceShell
+      className={styles.shell}
+      title={project.name}
+      subtitle={
+        project.source_type
+          ? `来源：${projectSourceLabel(project.source_type)} · ${project.source_ref}`
+          : "独立制作（无来源，不影响任何功能）"
+      }
+      status={
+        <>
+          <span className="pill">{projectStatusLabel(project.status)}</span>
+          <span className="pill">{project.usage_kind || "用途未填写"}</span>
+          <span className="pill">{project.width_px}×{project.height_px}</span>
+        </>
+      }
+      backHref="/projects"
+      headerActions={<Link className="link" href="/start">开始做产品图</Link>}
+      versions={<RevisionRail projectId={id ?? ""} />}
+    >
       <SourceImagePanel
         mode="background_plate_lock"
         projectId={id ?? ""}
         returnEnabled={!!binding}
         reloadKey={plateReload}
+        preferredInputId={preferredInputId}
         onReturned={() => void load()}
         materialsSlot={benchMaterials}
         railSlot={
           <>
-            <RevisionRail projectId={id ?? ""} />
             <MotionRefNote projectId={id ?? ""} />
             <RecoveryStrip projectId={id ?? ""} />
             {id ? <SubjectFidelityPanel projectId={id} /> : null}
           </>
         }
-        uploadSlot={<PhotoUpload projectId={id ?? ""} onAttached={() => setPlateReload((k) => k + 1)} />}
+        uploadSlot={<PhotoUpload projectId={id ?? ""} onAttached={(_projectId, inputId) => { setPreferredInputId(inputId); setPlateReload((k) => k + 1); }} />}
       />
+      <details className={styles.more} data-region="next_steps">
+        <summary>更多制作方式（未开放的能力会明确说明）</summary>
       <div className="media-follow">
       <BackgroundReplacePanel
         projectId={id ?? ""}
@@ -1291,6 +1305,7 @@ export default function ProjectDetailPage() {
         </div>
       ) : null}
       </div>
-    </div>
+      </details>
+    </WorkspaceShell>
   );
 }

@@ -99,6 +99,7 @@ cd web && npm test                # vitest:BFF 三态(鉴权失败/服务不可�
 | `PLATFORM_TASK_BASE_URL` / `PLATFORM_TASK_TOKEN` | 生成开启时必需 | `:18103` |
 | `PLATFORM_BILLING_BASE_URL` / `PLATFORM_BILLING_TOKEN` | 计费开启时必需 | `:18102` |
 | `ECO_BILLING_ENABLED` | 默认 0 | 收费开关 |
+| `PRODUCT_BILLING_CENTER_URL` | 默认空 | 统一 Billing Center 公网入口；只接受 https、无凭据/端口/query/fragment、非 loopback/.invalid。未配置时额度不足只解释事实并保留报价引用，不渲染本地死链 |
 | `FEATURE_GENERATION_ENABLED` | 默认 0 | 生成能力开关 |
 | `FEATURE_PHOTO_UPLOAD` | 默认 0 | 产品照片上传开关(HUI-1697;off 时上传路由不注册=404 不可见) |
 | `PRODUCT_PHOTO_MAX_BYTES` | 默认 20971520 | 照片上传服务端单点大小上限(20MiB) |
@@ -169,6 +170,10 @@ Web(`web`,样例 `deploy/web.env.example`):
 | Motion 引用改价格或颜色 | 只记录参数，`product_regeneration=false`，`model_call_count=0`，主体哈希不变 |
 | Motion 引用批量重跑 | **409** `batch_rerun_unproven`。HUI-2732 未完成，不能证明其他变体执行次数为 0 时不重跑 |
 | 局部修改未确认影响范围 | **409** `impact_unacknowledged`，不落版本、不调用供应商 |
+| 未选定候选就采用 | **409** `not_selected`，不落版本 |
+| 未通过限定检查的候选要采用 | **409** `candidate_not_usable`，不落版本 |
+| 同一来源请求重复采用 | **200** 幂等返回同一版本，不追加第二版、不重复扣费 |
+| `FEATURE_SELECTIVE_REVISION=0` | `/api/v1/capabilities` 报 `selective_revision=false`；版本可读/采用/回退，局部修改控件前置说明不开放（没有 404 假动作） |
 | 局部修改 failed/unknown 或新 Brief | 不覆盖已采用版本；导出和下游引用必须点名版本，且不重新上传 |
 | 主体保真请求自报通过/授权 | **400** `invalid_request`(结论只由服务端计算) |
 | 未授权的真实生成 | 结论 **unknown**(待确认),`exact_product=false`,不扣费 |

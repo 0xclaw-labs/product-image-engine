@@ -182,6 +182,20 @@ func TestConsumeRefusesOrderFundsAndRereadsBalanceAfterTopup(t *testing.T) {
 	if handoff["entry"] != "billing_center" || handoff["return_target"] != "ti-product-image-engine-web" || handoff["quote_ref"] == "" || handoff["generate_allowed"] != false {
 		t.Fatalf("充值入口: %v", handoff)
 	}
+	if _, ok := handoff["billing_center_url"]; ok {
+		t.Fatalf("未配置统一充值页时不能编造 URL: %v", handoff)
+	}
+	// A configured public entry is carried in the same handoff; it is not a
+	// local route and it keeps the return target + quote reference.
+	f.srv.Cfg.BillingCenterURL = "https://billing.example.com/center"
+	st, configured := f.do(t, "POST", "/api/v1/billing/consume/quote", tok, body)
+	if st != http.StatusPaymentRequired {
+		t.Fatalf("同一余额不足事实应保持 402: %d %v", st, configured)
+	}
+	configuredHandoff, _ := configured["topup"].(map[string]any)
+	if configuredHandoff["billing_center_url"] != "https://billing.example.com/center" || configuredHandoff["return_target"] != "ti-product-image-engine-web" {
+		t.Fatalf("configured billing handoff: %v", configuredHandoff)
+	}
 	before := rec.BalanceReads
 	st, back := f.do(t, "POST", "/api/v1/billing/consume/return", tok, map[string]any{
 		"project_id": project.ID, "page": "success",

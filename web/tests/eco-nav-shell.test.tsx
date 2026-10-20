@@ -7,6 +7,7 @@ describe("EcoTopNav 标记", () => {
   it("登录壳标出当前应用、人民币徽标和历史仍可看，且不宣称已成熟", () => {
     const html = renderToStaticMarkup(
       createElement(EcoTopNav, {
+        currentApp: { appId: "product-image", display: "产品图", navState: "degraded" },
         scope: { kind: "personal", tenantId: null, display: "个人" },
         badgeText: "¥12.50",
         historyVisible: true,
@@ -33,11 +34,15 @@ describe("EcoTopNav 标记", () => {
     expect(html).toContain('data-app="product-image"');
     expect(html).toContain('data-history-visible="true"');
     expect(html).toContain('data-useful-mature="false"');
+    expect(html).toContain('data-nav-state="degraded"');
+    expect(html).toContain("内部预览");
     expect(html).toContain("产品图");
     expect(html).toContain("个人");
     expect(html).toContain("¥12.50");
     expect(html).toContain("返回 活动 A");
     expect(html).toContain('rel="noreferrer"');
+    expect(html).toContain("由平台 billing 只读提供");
+    expect(html).toContain('data-billing-badge="true"');
     expect(html).not.toContain("project_id");
     expect(html).not.toMatch(/点数|修点/);
   });

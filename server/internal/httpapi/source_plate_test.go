@@ -660,3 +660,79 @@ func TestPlateFlagOffClosesNewWorkButKeepsHistoryAndRecovery(t *testing.T) {
 		t.Fatal("a deleted result must no longer be displayed")
 	}
 }
+
+func (f *plateHTTPFixture) revisionState(t *testing.T, base string) map[string]any {
+	t.Helper()
+	w := f.raw(t, "GET", base, f.token, "")
+	if w.Code != 200 {
+		t.Fatalf("revision state: %d %s", w.Code, w.Body.String())
+	}
+	var state map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &state); err != nil {
+		t.Fatal(err)
+	}
+	return state
+}
+
+// TestPlateAdoptIsExplicitIdempotentAndServable pins the missing bridge between
+// "selected candidate" and "adopted version": selection alone must not move the
+// adopted pointer; adopt is explicit, idempotent per source run, and the version
+// content is the same paid composite that export serves.
+func TestPlateAdoptIsExplicitIdempotentAndServable(t *testing.T) {
+	f := newPlateHTTPFixture(t, "carton-1024x1024")
+	plate := gradientPNG(1024, 1024)
+	runID, _ := f.finish(t, "plate-adopt", plate)
+	revBase := "/api/v1/projects/" + f.project.ID + "/revisions"
+
+	// Selection is a candidate fact, not adoption.
+	if w := f.raw(t, "POST", f.path("/"+runID+"/adopt"), f.token, `{}`); w.Code != 409 || !strings.Contains(w.Body.String(), "not_selected") {
+		t.Fatalf("adopt before select must be refused: %d %s", w.Code, w.Body.String())
+	}
+	if w := f.raw(t, "GET", revBase, f.token, ""); w.Code != 200 || !strings.Contains(w.Body.String(), `"versions":[]`) {
+		t.Fatalf("nothing may be adopted before selection: %d %s", w.Code, w.Body.String())
+	}
+	if w := f.raw(t, "POST", f.path("/"+runID+"/select"), f.token, `{}`); w.Code != 200 {
+		t.Fatal(w.Code, w.Body.String())
+	}
+	beforeAdopt := f.ports.mutations()
+
+	w := f.raw(t, "POST", f.path("/"+runID+"/adopt"), f.token, `{}`)
+	if w.Code != 200 || !strings.Contains(w.Body.String(), `"run_id":"`+runID+`"`) {
+		t.Fatal(w.Code, w.Body.String())
+	}
+	state := f.revisionState(t, revBase)
+	if state["adopted_label"] != "V1" {
+		t.Fatalf("adopt must move the pointer: %v", state)
+	}
+	versions, _ := state["versions"].([]any)
+	if len(versions) != 1 {
+		t.Fatalf("one source run adopts one version: %v", versions)
+	}
+	v0, _ := versions[0].(map[string]any)
+	if v0["label"] != "V1" || v0["origin"] != "plate_lock" || v0["action"] != "adopt" || v0["target_version"] != runID || v0["outcome"] != "candidate" {
+		t.Fatalf("version provenance: %v", v0)
+	}
+
+	composite := f.raw(t, "GET", f.path("/"+runID+"/content"), f.token, "").Body.Bytes()
+	served := f.raw(t, "GET", revBase+"/V1/content", f.token, "")
+	if served.Code != 200 || !bytes.Equal(served.Body.Bytes(), composite) {
+		t.Fatalf("revision content must be the same composite: %d", served.Code)
+	}
+
+	// Retrying must not append V2 or change the adopted hash.
+	before, _ := state["adopted_content_hash"].(string)
+	again := f.raw(t, "POST", f.path("/"+runID+"/adopt"), f.token, `{}`)
+	if again.Code != 200 {
+		t.Fatalf("adopt must be idempotent per run: %d %s", again.Code, again.Body.String())
+	}
+	againState := f.revisionState(t, revBase)
+	if againState["adopted_label"] != "V1" || againState["adopted_content_hash"] != before {
+		t.Fatalf("retry changed adoption: %v", againState)
+	}
+	if got, _ := againState["versions"].([]any); len(got) != 1 {
+		t.Fatalf("retry appended a version: %v", got)
+	}
+	if f.ports.mutations() != beforeAdopt {
+		t.Fatalf("adopt must not submit, reconcile, cancel or release: before=%v after=%v", beforeAdopt, f.ports.mutations())
+	}
+}

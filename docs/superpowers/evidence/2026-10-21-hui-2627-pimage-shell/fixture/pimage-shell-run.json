@@ -1,0 +1,16 @@
+{
+  "layer": "fixture",
+  "at": "2026-10-20T19:20:03.830Z",
+  "results": [
+    {
+      "viewport": "desktop",
+      "layer": "fixture",
+      "ok": true
+    },
+    {
+      "viewport": "mobile",
+      "layer": "fixture",
+      "ok": true
+    }
+  ]
+}

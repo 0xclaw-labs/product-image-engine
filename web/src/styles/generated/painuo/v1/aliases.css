@@ -1,0 +1,19 @@
+/* Painuo 1.0.0; source 89ddf356439b8c7997884fc0a2d8066089570f441bb993f248c2d4ebf6c87d72; explicit scope only; profile product-image-web */
+[data-pn-surface="work.light"][data-pn-theme="dark"] {
+  --accent: var(--pn-brand-accent);
+  --bg: var(--pn-bg-page);
+  --border: var(--pn-border-default);
+  --card: var(--pn-bg-surface);
+  --danger: var(--pn-status-danger-fg);
+  --muted: var(--pn-text-muted);
+  --text: var(--pn-text-primary);
+}
+[data-pn-surface="work.light"][data-pn-theme="light"] {
+  --accent: var(--pn-brand-accent);
+  --bg: var(--pn-bg-page);
+  --border: var(--pn-border-default);
+  --card: var(--pn-bg-surface);
+  --danger: var(--pn-status-danger-fg);
+  --muted: var(--pn-text-muted);
+  --text: var(--pn-text-primary);
+}

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { SourceImageController, SourceHTTPError, formatMinor, canConfirm, requestState, decodeSourceRun, pendingHintKey, pickRecoveredRun } from "@/lib/source-image";
-import { quoted, plateDone, sourceAPIFixture, scope, capabilities } from "./source-image-fixture";
+import { quoted, plateDone, plateQuoted, sourceAPIFixture, scope, capabilities } from "./source-image-fixture";
 
 function controller(calls: string[]) {
   const api = sourceAPIFixture(calls);
@@ -153,6 +153,13 @@ describe("formal source explicit controller", () => {
     expect(pickRecoveredRun([newer, older, other, cancelled], "text_generate")?.run_id).toBe("sir_old");
     expect(pickRecoveredRun([newer, cancelled], "text_generate")?.run_id).toBe("sir_new");
     expect(pickRecoveredRun([cancelled], "text_generate")).toBeNull();
+    // Leave-and-return during a paid generation must resume the newest in-flight
+    // request, not an older successful record.
+    const oldPaid = { ...plateDone(), run_id: "sir_old_paid" };
+    const newPending = { ...plateQuoted(), run_id: "sir_new_pending", confirmed: true };
+    expect(pickRecoveredRun([newPending, oldPaid], "background_plate_lock")?.run_id).toBe("sir_new_pending");
+    const newQuoted = { ...plateQuoted(), run_id: "sir_new_quoted", confirmed: false };
+    expect(pickRecoveredRun([newQuoted, oldPaid], "background_plate_lock")?.run_id).toBe("sir_old_paid");
   });
   it("funds unknown does not become free and refund retains original charge", () => {
     expect(requestState({ ...quoted(), phase: "asset_pending", payment: { ...quoted().payment, status: "unknown" } })).toContain("素材保存中");

@@ -2,10 +2,10 @@
 
 import { useEffect, useId, useState } from "react";
 import {
-  CURRENT_APP,
   USEFUL_IMAGE_MATURE,
   type PayerScope,
 } from "@/lib/eco-nav";
+import type { CurrentAppFact } from "@/lib/eco-nav/registry";
 import styles from "./eco-nav.module.css";
 
 export type NavAppLink = {
@@ -16,6 +16,7 @@ export type NavAppLink = {
 };
 
 export default function EcoTopNav({
+  currentApp = { appId: "product-image", display: "产品图", navState: "unavailable" },
   scope,
   badgeText,
   historyVisible,
@@ -25,6 +26,7 @@ export default function EcoTopNav({
   onSwitchScope,
   onLogout,
 }: {
+  currentApp?: CurrentAppFact;
   scope: PayerScope;
   badgeText: string;
   historyVisible: boolean;
@@ -53,11 +55,21 @@ export default function EcoTopNav({
       data-eco-topnav="true"
       data-history-visible={historyVisible ? "true" : "false"}
       data-useful-mature={USEFUL_IMAGE_MATURE ? "true" : "false"}
-      data-app={CURRENT_APP.appId}
+      data-app={currentApp.appId}
+      data-nav-state={currentApp.navState}
     >
       <span className={styles.appName} aria-current="page">
-        {CURRENT_APP.display}
+        {currentApp.display}
       </span>
+      {currentApp.navState === "degraded" ? (
+        <span className={styles.badgeState} title="注册表标记为内部降级；不代表生产就绪">
+          内部预览
+        </span>
+      ) : currentApp.navState === "unavailable" ? (
+        <span className={styles.badgeState} title="注册表没读到当前应用；只渲染安全壳">
+          状态待确认
+        </span>
+      ) : null}
       <span className={`${styles.srOnly}`}>当前应用</span>
 
       <div className={styles.wrap}>
@@ -147,9 +159,10 @@ export default function EcoTopNav({
         ) : null}
       </div>
 
-      <span className={styles.badge} title="人民币或渠道额度">
+      <span className={styles.badge} title="人民币或渠道额度" data-billing-badge="true">
         {badgeText}
       </span>
+      <span className={styles.srOnly}>计费事实由平台 billing 只读提供，本应用没有第二个钱包。</span>
 
       <div className={styles.wrap}>
         <button
@@ -165,6 +178,9 @@ export default function EcoTopNav({
             <button type="button" onClick={onLogout}>
               退出登录
             </button>
+            <p className={styles.note}>
+              计费事实：{badgeText} · 由平台 billing 只读提供，本应用没有第二个钱包。
+            </p>
             <p className={styles.note}>
               顶栏不代表主体保真或背景生成已经通过。
             </p>

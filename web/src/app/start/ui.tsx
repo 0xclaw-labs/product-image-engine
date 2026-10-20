@@ -42,7 +42,7 @@ type QuoteBody = {
   funds_state?: string;
   quote_origin?: string;
   quoted?: boolean;
-  topup?: { entry?: string; return_target?: string; quote_ref?: string };
+  topup?: { entry?: string; return_target?: string; quote_ref?: string; billing_center_url?: string };
 };
 
 export default function StartClient() {
@@ -74,11 +74,12 @@ export default function StartClient() {
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [preferredInputId, setPreferredInputId] = useState("");
   const [quotedPayer, setQuotedPayer] = useState("");
   const [quotedPresentation, setQuotedPresentation] = useState("");
   const [quotedGenerate, setQuotedGenerate] = useState(false);
   const [quotedMust, setQuotedMust] = useState(false);
-  const [quotedTopup, setQuotedTopup] = useState<{ entry: string; returnTarget: string; quoteRef: string } | null>(null);
+  const [quotedTopup, setQuotedTopup] = useState<{ entry: string; returnTarget: string; quoteRef: string; billingCenterUrl?: string } | null>(null);
   const [connection, setConnection] = useState("");
   const [settlement, setSettlement] = useState("");
   const [fundsState, setFundsState] = useState("");
@@ -140,7 +141,7 @@ export default function StartClient() {
     const topup = body?.topup;
     setQuotedTopup(
       topup?.entry && topup.return_target && topup.quote_ref
-        ? { entry: topup.entry, returnTarget: topup.return_target, quoteRef: topup.quote_ref }
+        ? { entry: topup.entry, returnTarget: topup.return_target, quoteRef: topup.quote_ref, billingCenterUrl: topup.billing_center_url }
         : null
     );
   }
@@ -366,6 +367,7 @@ export default function StartClient() {
           mode="background_plate_lock"
           projectId={projectId || undefined}
           reloadKey={reloadKey}
+          preferredInputId={preferredInputId}
           railSlot={
             <>
               <RevisionRail projectId={projectId || undefined} />
@@ -376,8 +378,9 @@ export default function StartClient() {
           uploadSlot={
             <PhotoUpload
               projectId={projectId || undefined}
-              onAttached={(id) => {
+              onAttached={(id, inputId) => {
                 setProjectId(id);
+                setPreferredInputId(inputId);
                 setReloadKey((k) => k + 1);
                 try {
                   const url = new URL(window.location.href);
@@ -429,6 +432,7 @@ export default function StartClient() {
                   entry: "billing_center",
                   returnTarget: "ti-product-image-engine-web",
                   quoteRef: quoteRef || quotedTopup?.quoteRef || "待重新报价",
+                  billingCenterUrl: quotedTopup?.billingCenterUrl,
                 }
               : quotedTopup
           }

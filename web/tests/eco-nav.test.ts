@@ -231,8 +231,9 @@ describe("顶栏不挤压主按钮", () => {
       path.resolve(__dirname, "../src/components/eco-nav/eco-nav.module.css"),
       "utf8"
     );
-    expect(css).toContain("height: 52px");
-    expect(css).toContain("height: 40px");
+    expect(css).toContain("min-height: 52px");
+    // 窄屏保留 compact 版式，但命中区提升到 44px（≥ navLayout 的 40px 视觉高度）。
+    expect(css).toContain("min-height: 44px");
     expect(css).toContain("max-width: 899px");
   });
 });
