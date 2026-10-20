@@ -154,3 +154,16 @@ Page patterns：
 - 浏览器：真实 headless Chrome；`fixture` 层。
 - 截图/JSON：`docs/superpowers/evidence/2026-10-21-hui-2627-pimage-shell/`。
 - 工作树保留；未 push。
+
+## 8. Integration（本地合并后复跑）
+
+- 锁：`/Volumes/MacintoshHD/派诺生态/.locks/product-image-engine.integrate.lock`（`shlock` 持锁；退出释放）。
+- 合并：`git merge --no-ff eco/hui-2627-pimage-shell` → `mb/eco-20261021`，合并提交 `9267163822f20a6c2563e966d8112330d33cfdd9`。
+- 合并树 vs feature HEAD：`git diff --stat` **空**（同一代码树）。
+- 合并后复跑（真实输出）：
+  - `cd server && go test ./...` → PASS（全部包 ok）。
+  - `cd web && npm ci` → ok（锁文件无新增依赖）。
+  - `cd web && npm test` → **64 files / 448 tests pass**。
+  - `cd web && npm run gate:shell` → exit 0（原始输出 `merged-gate-output.json`）。
+  - `cd web && npm run build` → exit 0。
+- 合并后 `git checkout main`；`mb/eco-20261021` 与 feature 分支保留，工作树保留。
