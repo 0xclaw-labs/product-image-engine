@@ -21,6 +21,7 @@ func setEnvs(t *testing.T, kv map[string]string) {
 		"FEATURE_LIGHT_SCENE", "FEATURE_LIGHT_CREATIVE", "PRODUCT_LIGHT_MODEL_CREDENTIAL", "PRODUCT_LIGHT_MODEL_URL",
 		"FEATURE_BG_PLATE_LOCK", "PRODUCT_FIDELITY_SAMPLES_DIR",
 		"FEATURE_SELECTIVE_REVISION", "FEATURE_MOTION_PRODUCT",
+		"PRODUCT_BILLING_CENTER_URL",
 	} {
 		t.Setenv(k, "")
 	}
@@ -247,5 +248,29 @@ func TestPlateLockDefaultsOffAndReadsItsOwnEnv(t *testing.T) {
 	setEnvs(t, map[string]string{"FEATURE_BG_PLATE_LOCK": "1", "PRODUCT_FIDELITY_SAMPLES_DIR": "/opt/samples"})
 	if c := Load(); !c.BgPlateLockEnabled || c.FidelitySamplesDir != "/opt/samples" {
 		t.Fatalf("%+v", c)
+	}
+}
+
+func TestBillingCenterEntryOnlyAcceptsPublicHTTPS(t *testing.T) {
+	for _, tc := range []struct{ raw, want string }{
+		{"", ""},
+		{"https://billing.example.com/center", "https://billing.example.com/center"},
+		{"https://billing.example.com", ""},
+		{"http://billing.example.com/center", ""},
+		{"https://user:pass@billing.example.com/center", ""},
+		{"https://billing.example.com:8443/center", ""},
+		{"https://billing.example.com/center?next=x", ""},
+		{"https://billing.example.com/center#x", ""},
+		{"https://127.0.0.1/center", ""},
+		{"https://localhost/center", ""},
+		{"https://billing.invalid/center", ""},
+		{"not a url", ""},
+	} {
+		t.Run(tc.raw, func(t *testing.T) {
+			c := Config{BillingCenterURL: tc.raw}
+			if got := c.BillingCenterEntry(); got != tc.want {
+				t.Fatalf("BillingCenterEntry(%q)=%q want %q", tc.raw, got, tc.want)
+			}
+		})
 	}
 }

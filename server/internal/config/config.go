@@ -1,6 +1,7 @@
 package config
 
 import (
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -41,6 +42,10 @@ type Config struct {
 
 	BillingEnabled    bool // ECO_BILLING_ENABLED,默认 off
 	GenerationEnabled bool // FEATURE_GENERATION_ENABLED,默认 off
+	// BillingCenterURL 是统一 Billing Center 的公网入口(可选)。只接受
+	// https、无凭据/端口/query/fragment、非 loopback/.invalid 的地址；
+	// 未配置或非法时充值入口只解释事实，不渲染死链，也不建本地钱包页。
+	BillingCenterURL string // PRODUCT_BILLING_CENTER_URL
 
 	// --- HUI-1745 I1:跨应用续接与成果回流 ---
 	AppID string // PRODUCT_APP_ID,默认 product-image(交接 target_app 校验/回执 source_app)
@@ -162,6 +167,7 @@ func Load() Config {
 
 		BillingEnabled:    getBoolEnv("ECO_BILLING_ENABLED", false),
 		GenerationEnabled: getBoolEnv("FEATURE_GENERATION_ENABLED", false),
+		BillingCenterURL:  os.Getenv("PRODUCT_BILLING_CENTER_URL"),
 
 		AppID:                getEnv("PRODUCT_APP_ID", "product-image"),
 		RegistryManifestPath: os.Getenv("PRODUCT_REGISTRY_MANIFEST"),
@@ -201,6 +207,25 @@ func Load() Config {
 
 		ShowcaseVideoEnabled: getBoolEnv("FEATURE_SHOWCASE_VIDEO", true),
 	}
+}
+
+// BillingCenterEntry returns the configured public Billing Center entry, or ""
+// when it is absent or fails the closed URL policy. An invalid value is treated
+// as unset: the UI must explain the absence, never link a guessed route.
+func (c Config) BillingCenterEntry() string {
+	raw := strings.TrimSpace(c.BillingCenterURL)
+	if raw == "" {
+		return ""
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u == nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.Port() != "" || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || u.Path == "" {
+		return ""
+	}
+	host := strings.ToLower(u.Hostname())
+	if host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "invalid" || strings.HasSuffix(host, ".invalid") {
+		return ""
+	}
+	return u.String()
 }
 
 // FatalProblems 返回阻断性问题(目前是 identity 必需配置与内部凭据)。

@@ -2,12 +2,13 @@
 // 真源=public-ai production-manifest.json（web/src/lib/eco-nav/registry/ 逐字节
 // vendored，见同目录 SOURCE.txt）。客户端不再内联 NEXT_PUBLIC_ECO_APP_LAUNCHES。
 import { describe, expect, it } from "vitest";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { GET as launchesGET } from "@/app/api/eco-nav/launches/route";
-import { emittable, registeredLaunchRows } from "@/lib/eco-nav/registry";
+import { currentApp, emittable, registeredLaunchRows } from "@/lib/eco-nav/registry";
 
 const webRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (p: string) => readFileSync(path.join(webRoot, p), "utf8");
@@ -54,13 +55,29 @@ describe("登记真源（production-manifest.json vendored）", () => {
   });
 });
 
+describe("当前应用身份（eco-nav/v1 nav-manifest）", () => {
+  it("vendored nav manifest 与记录的 sha256 一致", () => {
+    const raw = readFileSync(path.join(webRoot, "src/lib/eco-nav/registry/nav-manifest.json"));
+    const pinned = read("src/lib/eco-nav/registry/nav-manifest.sha256").trim().split(/\s+/)[0];
+    expect(createHash("sha256").update(raw).digest("hex")).toBe(pinned);
+    expect(pinned).toBe("b401299f17512c0f6e2fa9cd723afbbbdbbfce5fc6706519d9b502439f446ebf");
+  });
+
+  it("当前应用名与 nav_state 来自导航 manifest，不写死为可用", () => {
+    const current = currentApp();
+    expect(current).toEqual({ appId: "product-image", display: "产品图", navState: "degraded" });
+  });
+});
+
 describe("GET /api/eco-nav/launches", () => {
-  it("返回登记真源的可发射行（含 app_id/display_name），无 .invalid、无本应用行", async () => {
+  it("返回登记真源的可发射行（含 app_id/display_name）和当前应用，无 .invalid、无本应用 launch 行", async () => {
     const res = await launchesGET();
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
+      current: { appId: string; display: string; navState: string };
       launches: { app_id: string; display_name: string; target_id: string; url: string }[];
     };
+    expect(body.current).toEqual({ appId: "product-image", display: "产品图", navState: "degraded" });
     const goboost = body.launches.find((r) => r.target_id === "ti-goboost-web");
     expect(goboost?.url).toBe("https://goboost.modelxing.com/projects");
     expect(goboost?.display_name).toBe("故事板与画布");

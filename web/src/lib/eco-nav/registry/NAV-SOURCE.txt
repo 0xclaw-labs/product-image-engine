@@ -1,0 +1,5 @@
+upstream: bianjiefilm/public-ai
+path: docs/contracts/eco-nav/v1/nav-manifest.json
+pin: nav-manifest.json @ public-ai 58a2b760842b33449785016a5257979c21aeab86
+sha256: (see nav-manifest.sha256)
+status: VENDORED
