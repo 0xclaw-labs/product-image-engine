@@ -128,7 +128,7 @@ Page patterns：
 | 六个 page patterns | PASS | 组件/静态测试 + 浏览器 DOM |
 | 大图优先 / 非后端表单墙 | PASS（创建页仍保留上传/简报表单，但放在左栏；技术/闭源能力折叠） | 截图 + `WorkspaceShell` |
 | 真实流程：上传→简报→报价→确认→等待→离开返回→对照→选定→采用→回退→导出/回传 | PASS（fixture 层）；真实 provider N/A | Go adopt 测试 + 浏览器旅程 |
-| 局部修改保留非目标区域 | 既有能力保留；本轮不新增供应商；未开放时前置说明 | `capabilities` + RevisionRail |
+| 局部修改保留非目标区域 | **PARTIAL**：既有 HUI-2596 确定性路径保留，未开放时前置说明；本轮未把 adopted plate 版本作为局部编辑底图（现有编辑器仍要求用户提供原图/锁区 PNG），fixture 中 `FEATURE_SELECTIVE_REVISION=0`，因此浏览器只验证了“未开放”态 | `capabilities` + RevisionRail + NOT_VERIFIED #5 |
 | 真实额度不足路由 | PASS（配置/未配置两态）；真实充值 N/A | Go/TS 测试 |
 | 无第二设计系统/素材库/钱包/任务 | PASS | code review + grep |
 | 对比度/键盘/触控 gate | PASS | `gate:shell` + browser |
@@ -142,7 +142,7 @@ Page patterns：
 2. **真实平台服务**：platform-identity/upload/task/billing（18101–18104）未在本机监听；真实 Go server + web + 平台联调未跑。
 3. **真实计费/充值**：没有真实人民币扣款、充值、退款；Billing Center URL 未配置真实值；`PRODUCT_BILLING_CENTER_URL` 只做策略测试。
 4. **部署环境**：未部署、未推远端、未改 Linear。
-5. **真实局部编辑供应商**：HUI-2596 `PartialEdit=false`，真实供应商局部编辑 UNKNOWN；本轮只保证未开放时前置说明与不伪造。
+5. **真实局部编辑供应商/底图绑定**：HUI-2596 `PartialEdit=false`，真实供应商局部编辑 UNKNOWN；本轮只保证未开放时前置说明与不伪造。局部编辑 UI 仍未以 adopted plate 版本为底图，仍要求用户提供原图/锁区 PNG；fixture 中该能力关闭，只验证了未开放态。
 6. **真实跨应用 return target**：fixture 没有订单/活动 binding；真实 return target/回执未联调。
 7. **原生/设备/真机**：不适用 Web-only 验收；未跑 native。
 8. **真人观感评审**：`human_usefulness=NOT_RUN`；fixture 截图是 UI 证据，不是审美/质量验收。
