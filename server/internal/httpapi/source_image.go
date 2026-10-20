@@ -197,6 +197,8 @@ func (s *Server) handleSourceResource(w http.ResponseWriter, r *http.Request) {
 		s.handleSourceCancel(w, r)
 	case "select":
 		s.handleSourceSelect(w, r)
+	case "adopt":
+		s.handleSourceAdopt(w, r)
 	case "output":
 		s.handleSourceDelete(w, r)
 	case "content":

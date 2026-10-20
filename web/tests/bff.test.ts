@@ -7,6 +7,7 @@ import { POST as loginPOST } from "@/app/api/auth/login/route";
 import { GET as projectsGET } from "@/app/api/projects/route";
 import { POST as versionsPOST } from "@/app/api/projects/[id]/versions/route";
 import { GET as balanceGET } from "@/app/api/billing/balance/route";
+import { GET as capabilitiesGET } from "@/app/api/capabilities/route";
 
 function req(url: string, init: NonNullable<ConstructorParameters<typeof NextRequest>[1]> = {}): NextRequest {
   return new NextRequest(`http://localhost:3000${url}`, init);
@@ -30,6 +31,20 @@ async function bodyOf(res: Response) {
     error?: { code?: string; message?: string };
   } | null;
 }
+
+describe("BFF 能力开关", () => {
+  it("透传只读能力开关；无登录不触达上游", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ selective_revision: false, bg_plate_lock: true }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const res = await capabilitiesGET(authed("/api/capabilities"));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ selective_revision: false, bg_plate_lock: true });
+    const unauth = vi.fn();
+    vi.stubGlobal("fetch", unauth);
+    expect((await capabilitiesGET(req("/api/capabilities"))).status).toBe(401);
+    expect(unauth).not.toHaveBeenCalled();
+  });
+});
 
 describe("BFF 鉴权失败态", () => {
   it("无 Cookie 访问 session → 401,且不触达上游", async () => {
