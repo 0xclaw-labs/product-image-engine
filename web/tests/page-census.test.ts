@@ -216,7 +216,8 @@ describe("半成品标记", () => {
     const want = new Map<string, Marker[]>([
       ["/", []],
       // HUI-2627 fix2:三个路由页的行内样式收敛为版式工具类,标记账随之收缩。
-      ["/login", ["raw input"]],
+      // 统一登录改造(2026-10-21):/login 表单收敛进 @painuo/login-page,裸 input 清零。
+      ["/login", []],
       ["/start", []],
       ["/projects", ["raw input", "raw table"]],
       ["/projects/[id]", ["raw button", "raw input", "raw table"]],

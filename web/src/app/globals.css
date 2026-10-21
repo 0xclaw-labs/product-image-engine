@@ -5,11 +5,12 @@
  * 只把历史类名映射到 --pn-* 语义角色，并保留 reset/版式/响应式事实。
  */
 :root {
-  /* 统一登录组件（@painuo/login-page）brand.accent 注入桥（随主色体系取值） */
-  --accent: #2563eb;
-  --accent-hover: #1d4ed8;
-  --accent-weak: #dbeafe;
-  --on-accent: #ffffff;
+  /* 统一登录组件（@painuo/login-page）brand.accent 注入桥：
+     直取 --pn-brand-* 语义角色，不在本文件引入第二套裸色值。 */
+  --accent: var(--pn-brand-accent);
+  --accent-hover: var(--pn-brand-hover);
+  --accent-weak: var(--pn-brand-weak);
+  --on-accent: var(--pn-brand-ink);
 
   color-scheme: dark;
   --app-max: 1440px;
