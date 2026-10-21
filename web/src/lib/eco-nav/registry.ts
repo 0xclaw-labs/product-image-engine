@@ -1,6 +1,5 @@
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import productionManifest from "./registry/production-manifest.json";
+import navManifest from "./registry/nav-manifest.json";
 
 /**
  * HUI-2227 残差②：生态导航登记真源。
@@ -13,12 +12,6 @@ import { fileURLToPath } from "node:url";
 type LaunchTargetRow = { target_id?: string; kind?: string; url?: string };
 type RegistryApp = { app_id?: string; display_name?: string; enabled?: boolean; launch_targets?: LaunchTargetRow[] };
 type RegistryFile = { apps?: RegistryApp[] };
-
-const registryDir = join(dirname(fileURLToPath(import.meta.url)), "registry");
-
-function readRegistry(name: string): RegistryFile {
-  return JSON.parse(readFileSync(join(registryDir, name), "utf8")) as RegistryFile;
-}
 
 export function emittable(raw: string): boolean {
   let url: URL;
@@ -50,7 +43,7 @@ const NAV_STATES = new Set(["available", "degraded", "unavailable"]);
 /** 当前应用身份/就绪态来自 eco-nav/v1 nav-manifest；缺失/非法时 fail-closed。 */
 export function currentApp(): CurrentAppFact {
   try {
-    const file = JSON.parse(readFileSync(join(registryDir, "nav-manifest.json"), "utf8")) as {
+    const file = navManifest as {
       manifest_version?: string;
       apps?: { app_id?: string; default_display_name?: string; nav_state?: string }[];
     };
@@ -73,7 +66,7 @@ export interface LaunchRow {
 
 /** 生产表 → 可发射 launch 行（含展示名；无真实地址的行缺失，不冒充）。 */
 export function registeredLaunchRows(): LaunchRow[] {
-  const file = readRegistry("production-manifest.json");
+  const file = productionManifest as unknown as RegistryFile;
   const out: LaunchRow[] = [];
   for (const app of file.apps ?? []) {
     if (app.enabled === false) continue;
