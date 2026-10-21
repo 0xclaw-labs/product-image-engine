@@ -118,3 +118,33 @@ export function quoteFingerprint(input: {
   const size = input.size || input.resolution;
   return [input.payerAccountRef, String(input.imageCount), input.resolution, input.capability, input.pricingVersion, model, size].join("\n");
 }
+
+// topupHref returns a safe absolute unified-billing entry. A deployment without
+// a registered public Billing Center URL must not produce a local/dead route:
+// callers render an explicit absence explanation instead.
+export function topupHref(
+  raw: string | undefined,
+  returnTarget: string,
+  quoteRef: string
+): string | null {
+  if (!raw) return null;
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== "https:" || url.username || url.password || url.port || !url.pathname || url.pathname === "/") {
+    return null;
+  }
+  const host = url.hostname.toLowerCase();
+  if (host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "invalid" || host.endsWith(".invalid")) {
+    return null;
+  }
+  const out = new URL(url.toString());
+  out.search = "";
+  out.hash = "";
+  out.searchParams.set("return_target", returnTarget);
+  out.searchParams.set("quote_ref", quoteRef);
+  return out.toString();
+}

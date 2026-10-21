@@ -58,6 +58,12 @@ export function candidateSummary(c: PlateCandidate): Candidate {
 }
 
 export function plate(v: SourceRunView | null) { return v?.mode === "background_plate_lock" ? v.plate ?? null : null; }
+
+// chooseSupportedInput prefers the input the user just uploaded/attached, and
+// only falls back to the first server-supported input when that id is absent.
+export function chooseSupportedInput<T extends { input_id: string }>(supported: T[], inputId?: string): T | undefined {
+  return supported.find((item) => item.input_id === inputId) ?? supported[0];
+}
 export const charged = (v: SourceRunView): boolean => v.payment.status === "charged";
 export const canSelectPlate = (v: SourceRunView): boolean => !!plate(v) && plate(v)!.candidate_state === "limited_candidate" && !v.deleted && charged(v) && !v.selected;
 export const canExportPlate = (v: SourceRunView): boolean => !!plate(v) && plate(v)!.candidate_state === "limited_candidate" && !v.deleted && charged(v);

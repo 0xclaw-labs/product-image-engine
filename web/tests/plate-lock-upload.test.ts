@@ -16,7 +16,7 @@ const file = (size = 3, name = "a.png") => new File([new Uint8Array(size).fill(1
 describe("photo upload through the existing BFF routes", () => {
   it("with no project: uploads, creates a personal project, then attaches the input", async () => {
     const calls: Call[] = [];
-    expect(await uploadAndAttach(file(), undefined, fetcher(calls))).toBe("proj_new");
+    expect(await uploadAndAttach(file(), undefined, fetcher(calls))).toEqual({ projectId: "proj_new", inputId: "pin_1" });
     expect(calls.map(c => `${c.method} ${c.url.split("?")[0]}`)).toEqual(["POST /api/photos", "POST /api/projects", "POST /api/projects/proj_new/inputs"]);
     expect(calls[0].url).toContain("purpose=project_photo");
     expect(JSON.parse(String(calls[1].body))).toEqual({ name: "个人商品图", usage_kind: "电商主图", width_px: 1024, height_px: 1024, source_type: "standalone" });
@@ -25,7 +25,7 @@ describe("photo upload through the existing BFF routes", () => {
 
   it("with a project: never creates another one", async () => {
     const calls: Call[] = [];
-    expect(await uploadAndAttach(file(), "proj_a", fetcher(calls))).toBe("proj_a");
+    expect(await uploadAndAttach(file(), "proj_a", fetcher(calls))).toEqual({ projectId: "proj_a", inputId: "pin_1" });
     expect(calls.some(c => c.url === "/api/projects")).toBe(false);
   });
 

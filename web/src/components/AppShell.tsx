@@ -4,9 +4,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import EcoTopNav, { type NavAppLink } from "@/components/eco-nav/EcoTopNav";
 import { useWorkbenchFact, WorkbenchProvider } from "@/components/eco-nav/workbench";
-import type { LaunchRow } from "@/lib/eco-nav/registry";
+import type { CurrentAppFact, LaunchRow } from "@/lib/eco-nav/registry";
 import {
-  CURRENT_APP,
   applyPayerSwitch,
   billingBadgeFromPayload,
   manualAppSwitch,
@@ -39,15 +38,26 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
   // public-ai production-manifest.json）；拉取失败保持仅当前应用（fail-closed），
   // 客户端不再内联部署期目录。
   const [launchRows, setLaunchRows] = useState<LaunchRow[]>([]);
+  const [currentApp, setCurrentApp] = useState<CurrentAppFact>({
+    appId: "product-image",
+    display: "产品图",
+    navState: "unavailable",
+  });
 
   useEffect(() => {
     if (!show) return;
     let cancelled = false;
     (async () => {
       const res = await fetch("/api/eco-nav/launches");
-      const body = (await res.json().catch(() => null)) as { launches?: LaunchRow[] } | null;
+      const body = (await res.json().catch(() => null)) as {
+        current?: CurrentAppFact;
+        launches?: LaunchRow[];
+      } | null;
       if (!cancelled && Array.isArray(body?.launches)) {
         setLaunchRows(body.launches);
+      }
+      if (!cancelled && body?.current && typeof body.current.appId === "string" && typeof body.current.display === "string") {
+        setCurrentApp(body.current);
       }
     })();
     return () => {
@@ -103,14 +113,14 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
   });
   const apps: NavAppLink[] = [
     {
-      appId: CURRENT_APP.appId,
-      display: CURRENT_APP.display,
+      appId: currentApp.appId,
+      display: currentApp.display,
       href: null,
       current: true,
     },
   ];
   for (const row of launchRows) {
-    if (row.app_id === CURRENT_APP.appId) continue;
+    if (row.app_id === currentApp.appId) continue;
     const plan = manualAppSwitch({ launchUrl: row.url, appId: row.app_id });
     apps.push({
       appId: row.app_id,
@@ -141,6 +151,7 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
     <>
       {show ? (
         <EcoTopNav
+          currentApp={currentApp}
           scope={scope}
           badgeText={badgeText}
           historyVisible={historyVisible}

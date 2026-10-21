@@ -12,7 +12,9 @@ import { Field } from "@/components/ui/field";
 export const MAX_PHOTO_BYTES = 20 << 20;
 export const ACCEPT = "image/png,image/jpeg,image/webp";
 
-export async function uploadAndAttach(file: File, projectId: string | undefined, fetcher: typeof fetch = fetch): Promise<string> {
+export type UploadedInput = { projectId: string; inputId: string };
+
+export async function uploadAndAttach(file: File, projectId: string | undefined, fetcher: typeof fetch = fetch): Promise<UploadedInput> {
   if (file.size === 0) throw new Error("文件是空的，请重新选择。");
   if (file.size > MAX_PHOTO_BYTES) throw new Error("照片超过 20 MB，请压缩后再试。");
   const bytes = await file.arrayBuffer();
@@ -33,11 +35,15 @@ export async function uploadAndAttach(file: File, projectId: string | undefined,
     method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin",
     body: JSON.stringify({ platform_asset_id: photo.platform_asset_id, snapshot_name: photo.original_name ?? file.name, snapshot_size: photo.size_bytes ?? bytes.byteLength, snapshot_content_type: photo.media_type ?? "application/octet-stream" }),
   });
-  if (!attach.ok) throw new Error("照片已保存，但没有加入工程，请重试。");
-  return project;
+  const attached = (await attach.json().catch(() => null)) as { input?: { id?: string } } | null;
+  const inputId = attached?.input?.id;
+  if (!attach.ok || typeof inputId !== "string" || !/^[A-Za-z0-9_-]{1,256}$/.test(inputId)) {
+    throw new Error("照片已保存，但没有加入工程，请重试。");
+  }
+  return { projectId: project, inputId };
 }
 
-export function PhotoUpload({ projectId, onAttached }: { projectId?: string; onAttached: (projectId: string) => void }) {
+export function PhotoUpload({ projectId, onAttached }: { projectId?: string; onAttached: (projectId: string, inputId: string) => void }) {
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -48,11 +54,11 @@ export function PhotoUpload({ projectId, onAttached }: { projectId?: string; onA
     if (!file || busy) return;
     setBusy(true); setError(""); setDone("");
     try {
-      const project = await uploadAndAttach(file, projectId);
+      const attached = await uploadAndAttach(file, projectId);
       setDone("照片已加入。");
       setFile(null);
       if (input.current) input.current.value = "";
-      onAttached(project);
+      onAttached(attached.projectId, attached.inputId);
     } catch (err) {
       setError(err instanceof Error ? err.message : "上传没有成功，请稍后重试。");
     } finally {

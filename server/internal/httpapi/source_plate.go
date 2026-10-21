@@ -12,6 +12,7 @@ import (
 	"github.com/bianjiefilm/product-image-engine/server/internal/fidelitysamples"
 	"github.com/bianjiefilm/product-image-engine/server/internal/platelock"
 	"github.com/bianjiefilm/product-image-engine/server/internal/platform"
+	"github.com/bianjiefilm/product-image-engine/server/internal/revision"
 	"github.com/bianjiefilm/product-image-engine/server/internal/sourceflow"
 	si "github.com/bianjiefilm/product-image-engine/server/internal/sourceimage"
 	"github.com/bianjiefilm/product-image-engine/server/internal/store"
@@ -266,6 +267,93 @@ func (s *Server) handlePlateExport(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/zip")
 	w.Header().Set("Content-Disposition", `attachment; filename="background-replaced.zip"`)
 	_, _ = w.Write(buf.Bytes())
+}
+
+// handleSourceAdopt bridges an explicitly selected, limited-fidelity candidate
+// into the single revision ledger. Selection only marks a candidate; adoption
+// is a separate, explicit pointer move. No supplier is called and no charge is
+// made: the composite is already paid for and quality-gated.
+func (s *Server) handleSourceAdopt(w http.ResponseWriter, r *http.Request) {
+	if !sourceMethod(w, r, http.MethodPost) {
+		return
+	}
+	if _, ok := sourceBody(w, r); !ok || !s.sourceService(w, r) {
+		return
+	}
+	actor, _ := sourceActor(r)
+	project := r.PathValue("id")
+	runID := r.PathValue("runId")
+	run, e := s.Source.LoadRun(r.Context(), actor, project, runID, true)
+	if e != nil {
+		s.sourceResult(w, r, si.Run{}, e)
+		return
+	}
+	if !run.Selected {
+		writeErr(w, http.StatusConflict, "not_selected", "先选定候选，再采用为版本")
+		return
+	}
+	pc, e := s.Source.LoadPlate(r.Context(), actor, project, runID)
+	if e != nil {
+		s.sourceResult(w, r, pc.Run, e)
+		return
+	}
+	if pc.Derivation.CandidateState != si.CandidateLimited || len(pc.Derivation.PNG) == 0 {
+		writeErr(w, http.StatusConflict, "candidate_not_usable", "候选未通过限定检查，不能采用")
+		return
+	}
+	tenant := run.Intent.Scope.TenantID
+	snap, e := s.St.LoadRevisionLedger(r.Context(), tenant, project)
+	if e != nil {
+		writeStoreErr(w, e)
+		return
+	}
+	led, e := revision.Restore(snap)
+	if e != nil {
+		writeRevisionErr(w, e)
+		return
+	}
+	// Idempotent: the same source run is adopted at most once, even if the
+	// browser retries or the user reloads.
+	for _, v := range led.Versions {
+		if v.Origin == "plate_lock" && v.TargetVersion == runID && v.Outcome == revision.StatusCandidate && len(v.PNG) > 0 {
+			if led.AdoptedID != v.Label {
+				if e = led.Adopt(v.Label); e != nil {
+					writeRevisionErr(w, e)
+					return
+				}
+				if e = s.St.SaveRevisionLedger(r.Context(), tenant, project, led.Snapshot()); e != nil {
+					writeStoreErr(w, e)
+					return
+				}
+			}
+			s.sourceResult(w, r, run, nil)
+			return
+		}
+	}
+	intent := revision.Intent{
+		Schema:          revision.Schema,
+		Source:          revision.SourceClick,
+		Action:          revision.ActionAdopt,
+		PreserveSubject: true,
+		Locks:           []string{revision.LockProduct, revision.LockLogo, revision.LockPackagingText},
+		Region:          revision.RegionNone,
+		TargetVersion:   runID,
+		Text:            "采用背景替换候选",
+	}
+	version, e := led.PutCandidate(pc.Derivation.PNG, intent, "plate_lock", "")
+	if e != nil {
+		writeRevisionErr(w, e)
+		return
+	}
+	if e = led.Adopt(version.Label); e != nil {
+		writeRevisionErr(w, e)
+		return
+	}
+	if e = s.St.SaveRevisionLedger(r.Context(), tenant, project, led.Snapshot()); e != nil {
+		writeStoreErr(w, e)
+		return
+	}
+	s.sourceResult(w, r, run, nil)
 }
 
 // handleSourceReturn registers the selected, limited-candidate composite as a

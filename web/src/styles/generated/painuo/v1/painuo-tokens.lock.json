@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "painuo-token-lock/v1",
+  "tokenVersion": "1.0.0",
+  "sourceCommit": "58a2b760842b33449785016a5257979c21aeab86",
+  "sourceCanonicalSha256": "89ddf356439b8c7997884fc0a2d8066089570f441bb993f248c2d4ebf6c87d72",
+  "consumerId": "product-image-web",
+  "defaultSurface": "work.light",
+  "defaultTheme": "light",
+  "files": {
+    "web/src/styles/generated/painuo/v1/tokens.css": "c84dae68db6a1a4701af3debb78e3e540ec2f298d3a0131cd7dce1d63c5f41e8",
+    "web/src/styles/generated/painuo/v1/tokens.scss": "7dd448db573d7bb35da397597e59dd63eea786e89bd1f8b230592e94b298242b",
+    "web/src/styles/generated/painuo/v1/resolved.json": "3df686d3d96f870636d5b352833598c3d1ffaf959260fc7e263ad60670f0fdd2",
+    "web/src/styles/generated/painuo/v1/token-table.md": "7f3234f84542f9ea7b1910cb15c7f6c7b36b1c9612da8b530d8983d83f7e418c",
+    "web/src/styles/generated/painuo/v1/lint-allowlist.json": "c579f4b38ac2a8db5194df0634036a885677b25b295a385385f810f49a240eff",
+    "web/src/styles/generated/painuo/v1/aliases.css": "c8eb32b0fdb419e38acf75f8e055700153e750ab7cb535a2318330d9a048f62d",
+    "web/src/styles/generated/painuo/v1/aliases.scss": "f0cdaa191e83dca636d61b155e560f839eb16c1a61624295c37ab10ddb3f0705"
+  },
+  "aliasesDeprecatedUntil": {
+    "v1FirstReleasedAt": null,
+    "minimumRetainedVersion": "1.2.0",
+    "minimumDays": 90,
+    "removalMajor": 2,
+    "windowRule": "laterOfV1_2ReleaseAnd90DaysAfterV1FirstRelease",
+    "producerExpectedRepo": "github.com/bianjiefilm/public-ai"
+  }
+}

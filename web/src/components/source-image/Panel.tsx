@@ -51,8 +51,8 @@ async function principal(ensure:()=>void): Promise<{userID:string;accountID:stri
 }
 // A lease binds async validation to the panel that dispatched it, before controller scope exists.
 type PanelLease={generation:number;project:string};
-export type SourceImagePanelProps={projectId?:string;mode?:SourceModeName;returnEnabled?:boolean;reloadKey?:number;uploadSlot?:React.ReactNode;materialsSlot?:ReactNode;railSlot?:ReactNode;onReturned?:()=>void};
-export function SourceImagePanel({projectId,mode="text_generate",returnEnabled=false,reloadKey=0,uploadSlot,materialsSlot,railSlot,onReturned}:SourceImagePanelProps) {
+export type SourceImagePanelProps={projectId?:string;mode?:SourceModeName;returnEnabled?:boolean;reloadKey?:number;preferredInputId?:string;uploadSlot?:React.ReactNode;materialsSlot?:ReactNode;railSlot?:ReactNode;onReturned?:()=>void};
+export function SourceImagePanel({projectId,mode="text_generate",returnEnabled=false,reloadKey=0,preferredInputId="",uploadSlot,materialsSlot,railSlot,onReturned}:SourceImagePanelProps) {
   const plateMode=mode === "background_plate_lock", runParam=plateMode ? "plate_run" : "source_run";
   const controller=useRef<SourceImageController | null>(null); if(!controller.current) controller.current=new SourceImageController(sourceImageAPI,undefined,undefined,mode);
   const c=controller.current;
@@ -99,6 +99,9 @@ export function SourceImagePanel({projectId,mode="text_generate",returnEnabled=f
     return()=>{if(current(l)){invalidate();mounted.current=false;}};
   // Effects perform only session/capabilities/history/original-run GET reads.
   },[projectId,c,reloadKey]);
+  // A freshly uploaded/attached input must become the explicit quote input,
+  // not silently fall back to the first previously-supported photo.
+  useEffect(()=>{if(preferredInputId)setInputId(preferredInputId);},[preferredInputId]);
   useEffect(()=>{
     const interval=setInterval(()=>{if(c.view?.quote)repaint();},1000);
     const hide=()=>{invalidate();setHistory([]);setNextCursor("");setArmed(false);setBusy(false);repaint();};
@@ -160,7 +163,7 @@ export function SourceImagePanel({projectId,mode="text_generate",returnEnabled=f
   const local=(work:()=>void)=>{if(current(rendered))work();};
   if(plateMode)return <PlateLockScreen view={view} capabilities={sameScope ? c.capabilities:null} nowUnix={Math.floor(Date.now()/1000)} projectID={displayed} loading={!loaded && !!displayed} busy={busy && !!operationRunning.current} background={background} inputId={inputId} notice={notice} returnEnabled={returnEnabled} returnAck={ack} returnNotice={returnNotice} uploadSlot={uploadSlot} materialsSlot={materialsSlot} railSlot={railSlot}
     onBackground={v=>local(()=>setBackground(v))} onInput={v=>local(()=>setInputId(v))} onQuote={()=>void operate(quote)} onConfirm={()=>void operate(l=>step(l,()=>c.confirm()))}
-    onRefresh={()=>void operate(l=>step(l,()=>c.action("reconcile")))} onSelect={()=>void operate(l=>step(l,()=>c.action("select")))} onReturnAck={v=>local(()=>setAck(v))} onReturn={()=>void operate(returnToSource)}
+    onRefresh={()=>void operate(l=>step(l,()=>c.action("reconcile")))} onSelect={()=>void operate(l=>step(l,()=>c.action("select")))} onAdopt={()=>void operate(async l=>{await step(l,()=>c.action("adopt"));ensure(l);setNotice("已采用为当前版本。版本区可以回退。");try{window.dispatchEvent(new Event("pimage:revisions-changed"));}catch{}})} onReturnAck={v=>local(()=>setAck(v))} onReturn={()=>void operate(returnToSource)}
     onNew={()=>local(()=>{try {if(operationRunning.current)throw new Error("pending");c.newRequest();hint(rendered);setReturnNotice("");setAck(false);setNotice("已清空当前画面。文字和底板没变时，服务端继续用原来的请求，不会另开一笔费用。");repaint();}catch {setNotice("上一步还没有结束，请稍候。");}})} />;
   return <SourceImageScreen view={view} capabilities={sameScope ? c.capabilities:null} nowUnix={Math.floor(Date.now()/1000)} projectID={displayed} prompt={prompt} busy={busy && !!operationRunning.current} notice={notice} deleteArmed={sameScope && armed} history={history.filter(r=>belongs(r) && r.mode === mode)} nextCursor={sameScope ? nextCursor:""} pendingKey={sameScope ? c.pendingHint?.requestKey:undefined}
     onPrompt={v=>local(()=>setPrompt(v))} onQuote={()=>void operate(quote)} onConfirm={()=>void operate(l=>step(l,()=>c.confirm()))} onRefresh={()=>void operate(l=>step(l,()=>c.restore(l.project,c.view?.run_id ?? "")))} onReload={()=>void operate(async l=>{await readHistory(l);const h=c.pendingHint;if(h)await step(l,()=>c.restoreHint(h));})}

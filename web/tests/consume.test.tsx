@@ -13,6 +13,7 @@ import {
   payerLabel,
   presentQuote,
   quoteFingerprint,
+  topupHref,
   visibleBooks,
 } from "@/lib/consume";
 
@@ -108,6 +109,36 @@ describe("产品图消费报价", () => {
     expect(html).toContain('data-generate="false"');
     expect(html).not.toContain("<input");
     expect(html).toContain('data-payer-source="server"');
+    expect(html).not.toContain("/billing-center");
+    expect(html).toContain("本环境未登记统一充值页地址");
+    expect(html).toContain('data-testid="billing-center-unregistered"');
+  });
+
+  it("only a registered public https Billing Center becomes a link", () => {
+    expect(topupHref("https://billing.example.com/center", "ti-product-image-engine-web", "qte_1")).toBe(
+      "https://billing.example.com/center?return_target=ti-product-image-engine-web&quote_ref=qte_1"
+    );
+    for (const bad of [undefined, "", "/billing-center", "http://billing.example.com/center", "https://user:pass@billing.example.com/center", "https://billing.example.com:8443/center", "https://localhost/center"]) {
+      expect(topupHref(bad, "ti-product-image-engine-web", "qte_1"), String(bad)).toBeNull();
+    }
+    const html = renderToStaticMarkup(
+      createElement(ConsumePanel, {
+        payerDisplay: "个人付款",
+        presentation: "本次预计 ¥0.25",
+        generateAllowed: false,
+        mustRequote: true,
+        topup: {
+          entry: "billing_center",
+          returnTarget: "ti-product-image-engine-web",
+          quoteRef: "qte_1",
+          billingCenterUrl: "https://billing.example.com/center",
+        },
+        levels: completionLevels(),
+      })
+    );
+    expect(html).toContain('data-testid="billing-center-link"');
+    expect(html).toContain("https://billing.example.com/center?return_target=ti-product-image-engine-web&amp;quote_ref=qte_1");
+    expect(html).not.toContain("/billing-center");
   });
 
   it("没有报价对象时不显示人民币，夹具报价不是 Billing PASS", () => {

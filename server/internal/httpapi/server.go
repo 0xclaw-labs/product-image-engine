@@ -84,6 +84,7 @@ func (s *Server) Router() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.handleHealthz)
 	mux.HandleFunc("GET /readyz", s.handleReadyz)
+	mux.Handle("GET /api/v1/capabilities", s.guard(true, s.handleCapabilities))
 
 	// 认证入口:只需服务间凭据(用户尚未登录)。
 	mux.Handle("POST /api/v1/auth/login", s.guard(false, s.handleLogin))
@@ -108,7 +109,7 @@ func (s *Server) Router() http.Handler {
 	mux.Handle("POST /api/v1/projects/{id}/first-image/refresh", s.guard(true, s.handleRefreshFirstImage))
 
 	// Source ownership is independent of legacy creation flags.
-	for _, path := range []string{"source-image-capabilities", "source-image-runs", "source-image-runs/by-request", "source-image-runs/{runId}", "source-image-runs/{runId}/confirm", "source-image-runs/{runId}/reconcile", "source-image-runs/{runId}/cancel", "source-image-runs/{runId}/select", "source-image-runs/{runId}/output", "source-image-runs/{runId}/content", "source-image-runs/{runId}/export", "source-image-runs/{runId}/return"} {
+	for _, path := range []string{"source-image-capabilities", "source-image-runs", "source-image-runs/by-request", "source-image-runs/{runId}", "source-image-runs/{runId}/confirm", "source-image-runs/{runId}/reconcile", "source-image-runs/{runId}/cancel", "source-image-runs/{runId}/select", "source-image-runs/{runId}/adopt", "source-image-runs/{runId}/output", "source-image-runs/{runId}/content", "source-image-runs/{runId}/export", "source-image-runs/{runId}/return"} {
 		mux.Handle("/api/v1/projects/{id}/"+path, s.guard(true, s.handleSourceResource))
 	}
 
@@ -249,13 +250,9 @@ func (s *Server) Router() http.Handler {
 		mux.Handle("POST /api/v1/projects/{id}/motion-refs/{refId}/parameters", s.guard(true, s.handleMotionParameter))
 	}
 
-	// 锁定后的局部修改(HUI-2596)。关闭时路由不注册。
-	// 没有供应商密钥时不调用模型，只锁回主体像素。
-	if s.Cfg.SelectiveRevisionEnabled {
-		mux.Handle("POST /api/v1/projects/{id}/revisions/intent", s.guard(true, s.handleRevisionIntent))
-		mux.Handle("POST /api/v1/projects/{id}/revisions/plan", s.guard(true, s.handleRevisionPlan))
-		mux.Handle("POST /api/v1/projects/{id}/revisions/outcome", s.guard(true, s.handleRevisionOutcome))
-		mux.Handle("POST /api/v1/projects/{id}/revisions/briefs", s.guard(true, s.handleRevisionBrief))
+	// 版本账本读取/采用/回退：局部修改(HUI-2596)与限定保真换背景的候选采用
+	// 共用同一 revision ledger。任一能力开启即可读取版本；不新增版本表。
+	if s.Cfg.SelectiveRevisionEnabled || s.Cfg.BgPlateLockEnabled {
 		mux.Handle("POST /api/v1/projects/{id}/revisions/rollback", s.guard(true, s.handleRevisionRollback))
 		mux.Handle("GET /api/v1/projects/{id}/revisions/compare", s.guard(true, s.handleRevisionCompare))
 		mux.Handle("POST /api/v1/projects/{id}/revisions/{label}/adopt", s.guard(true, s.handleRevisionAdopt))
@@ -263,6 +260,14 @@ func (s *Server) Router() http.Handler {
 		mux.Handle("POST /api/v1/projects/{id}/revisions/{label}/downstream", s.guard(true, s.handleRevisionDownstream))
 		mux.Handle("GET /api/v1/projects/{id}/revisions/{label}/content", s.guard(true, s.handleRevisionContent))
 		mux.Handle("GET /api/v1/projects/{id}/revisions", s.guard(true, s.handleListRevisions))
+	}
+	// 锁定后的局部修改(HUI-2596)。关闭时创建/计划路由不注册。
+	// 没有供应商密钥时不调用模型，只锁回主体像素。
+	if s.Cfg.SelectiveRevisionEnabled {
+		mux.Handle("POST /api/v1/projects/{id}/revisions/intent", s.guard(true, s.handleRevisionIntent))
+		mux.Handle("POST /api/v1/projects/{id}/revisions/plan", s.guard(true, s.handleRevisionPlan))
+		mux.Handle("POST /api/v1/projects/{id}/revisions/outcome", s.guard(true, s.handleRevisionOutcome))
+		mux.Handle("POST /api/v1/projects/{id}/revisions/briefs", s.guard(true, s.handleRevisionBrief))
 		mux.Handle("POST /api/v1/projects/{id}/revisions", s.guard(true, s.handleCreateRevision))
 	}
 

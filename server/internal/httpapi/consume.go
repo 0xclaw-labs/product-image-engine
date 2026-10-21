@@ -511,9 +511,14 @@ func (s *Server) topup(quoteRef string) (billconsume.Handoff, error) {
 	if len(allowed) > 0 {
 		target = allowed[0]
 	}
-	return billconsume.TopupHandoff(billconsume.TopupInput{
+	hand, err := billconsume.TopupHandoff(billconsume.TopupInput{
 		QuoteRef: quoteRef, ReturnTarget: target, Allowed: allowed, FundsShort: true,
 	})
+	if err != nil {
+		return hand, err
+	}
+	hand.BillingCenterURL = s.Cfg.BillingCenterEntry()
+	return hand, nil
 }
 
 func (s *Server) ownLaunchTargets() []string {

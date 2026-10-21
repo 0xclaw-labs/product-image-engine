@@ -18,8 +18,8 @@ const ACCESS = "fixture-access";
 const sha = (b) => crypto.createHash("sha256").update(b).digest("hex");
 const PASS = ["mask_pixels_identical", "coverage_logo", "coverage_packaging_text", "coverage_spec", "coverage_structure", "product_count", "output_size", "plate_size", "plate_is_new_background", "background_changed", "plate_task_succeeded", "plate_asset_hash_verified", "plate_charged_observed"];
 
-const state = { scenario: "limited", photos: new Map(), inputs: [], runs: new Map(), stats: { creates: 0, confirms: 0, selects: 0, returns: 0, receipts: 0, uploads: 0, projects: 0 }, serial: 0, revision: { adopted: "V1" } };
-const reset = () => { state.photos.clear(); state.inputs = []; state.runs.clear(); Object.keys(state.stats).forEach((k) => (state.stats[k] = 0)); state.serial = 0; state.revision.adopted = "V1"; };
+const state = { scenario: "limited", photos: new Map(), inputs: [], runs: new Map(), stats: { creates: 0, confirms: 0, selects: 0, returns: 0, receipts: 0, uploads: 0, projects: 0 }, serial: 0, revision: { adopted: "V1", plateAdopted: false } };
+const reset = () => { state.photos.clear(); state.inputs = []; state.runs.clear(); Object.keys(state.stats).forEach((k) => (state.stats[k] = 0)); state.serial = 0; state.revision.adopted = "V1"; state.revision.plateAdopted = false; };
 
 const json = (res, status, body) => { res.writeHead(status, { "Content-Type": "application/json", "Cache-Control": "no-store" }); res.end(JSON.stringify(body)); };
 const err = (res, status, code, message = code) => json(res, status, { error: { code, message } });
@@ -62,13 +62,16 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://127.0.0.1:${PORT}`);
   const p = url.pathname;
   if (p === "/__fixture/scenario" && req.method === "POST") { const b = JSON.parse((await body(req)).toString() || "{}"); state.scenario = b.name ?? "limited"; if (b.reset) reset(); return json(res, 200, { scenario: state.scenario }); }
-  if (p === "/__fixture/stats") return json(res, 200, { ...state.stats, scenario: state.scenario });
+  if (p === "/__fixture/stats") return json(res, 200, { ...state.stats, scenario: state.scenario, runs: [...state.runs.values()].map((r) => ({ id: r.id, confirmed: r.confirmed, derived: r.derived, selected: r.selected, polls: r.polls })) });
   if (p === "/__fixture/advance" && req.method === "POST") { for (const r of state.runs.values()) if (r.confirmed) r.derived = true; return json(res, 200, {}); }
   if (req.headers["x-product-internal-token"] !== TOKEN) return err(res, 401, "unauthenticated");
   if (req.headers.authorization !== `Bearer ${ACCESS}`) return err(res, 401, "unauthenticated");
   if (p === "/api/v1/auth/session") return json(res, 200, { principal: { user_id: "usr_fixture", account_id: "acct_fixture", tenant_id: "acct_fixture" } });
   if (p === "/api/v1/entry/personal") return json(res, 200, { sessions: [] });
   if (p === "/api/v1/billing/balance") return json(res, 200, { balance_cny: "100.00", items: [], account_id: "acct_fixture" });
+  // Runtime flags: selective revision is closed in this fixture, so the UI must
+  // hide local-edit controls up front rather than offer a 404 action.
+  if (p === "/api/v1/capabilities") return json(res, 200, { selective_revision: false, bg_plate_lock: true });
   if (p === "/api/v1/photos" && req.method === "POST") {
     const buf = await body(req);
     if (buf.subarray(0, 8).toString("hex") !== "89504e470d0a1a0a") return err(res, 415, "unsupported_media_type", "内容不是受支持的图片格式");
@@ -81,6 +84,15 @@ const server = http.createServer(async (req, res) => {
   }
   if (p === "/api/v1/projects" && req.method === "POST") { state.stats.projects++; return json(res, 201, { project: { id: "proj_fx", name: "个人商品图", status: "draft", width_px: 1024, height_px: 1024, source_type: "standalone" } }); }
   let m;
+  if ((m = p.match(/^\/api\/v1\/projects\/[^/]+\/inputs\/([^/]+)\/content$/)) && req.method === "GET") {
+    const input = state.inputs.find((i) => i.id === m[1]);
+    const photo = input && state.photos.get(input.platform_asset_id);
+    const frozen = photo?.frozen;
+    if (!frozen) return err(res, 404, "not_found");
+    const png = fs.readFileSync(path.join(SAMPLES, frozen.original.path));
+    res.writeHead(200, { "Content-Type": "image/png", "Content-Length": png.length, "Cache-Control": "no-store" });
+    return res.end(png);
+  }
   if ((m = p.match(/^\/api\/v1\/projects\/([^/]+)\/inputs$/)) && req.method === "POST") {
     const b = JSON.parse((await body(req)).toString());
     const input = { id: "pin_" + ++state.serial, platform_asset_id: b.platform_asset_id, snapshot_name: b.snapshot_name };
@@ -112,6 +124,10 @@ const server = http.createServer(async (req, res) => {
     if (action === "confirm") { await body(req); state.stats.confirms++; run.confirmed = true; return json(res, 200, view(run)); }
     if (action === "reconcile") { await body(req); if (run.confirmed && state.scenario !== "slow") run.derived = true; return json(res, 200, view(run)); }
     if (action === "select") { await body(req); if (view(run).plate.candidate_state !== "limited_candidate") return err(res, 409, "candidate_not_usable"); state.stats.selects++; run.selected = true; return json(res, 200, view(run)); }
+    // Mirrors the Go adopt contract: selection is a candidate fact; adopt is a
+    // separate explicit pointer move and is idempotent per source run. No
+    // generation, supplier call or charge happens here.
+    if (action === "adopt") { await body(req); if (!run.selected) return err(res, 409, "not_selected"); if (view(run).plate.candidate_state !== "limited_candidate") return err(res, 409, "candidate_not_usable"); state.revision.plateAdopted = true; state.revision.adopted = "V3"; return json(res, 200, view(run)); }
     if (action === "return") { await body(req); state.stats.returns++; return json(res, 200, { output: { id: "out_fx" } }); }
     if (action === "content") { res.writeHead(200, { "Content-Type": "image/png", "Content-Length": run.png.length, "X-Quality-Verdict": "limited" }); return res.end(run.png); }
     if (action === "export") { const zip = writeStoredZip({ "image.png": run.png, "quality.json": Buffer.from(report(run)), "snapshot.json": Buffer.from("{}") }); res.writeHead(200, { "Content-Type": "application/zip", "Content-Length": zip.length }); return res.end(zip); }
@@ -126,7 +142,9 @@ const server = http.createServer(async (req, res) => {
   }
   if ((m = p.match(/^\/api\/v1\/projects\/([^/]+)$/)) && req.method === "GET") {
     if (m[1] !== "proj_fx") return err(res, 404, "not_found", "没有打开这个工程。它可能不存在,或不属于当前账号。");
-    return json(res, 200, { project: FX_PROJECT, inputs: [], versions: [] });
+    // Inputs are fixture state created by the real /inputs route; the panel and
+    // materials rail read the same project aggregate as the Go server serves.
+    return json(res, 200, { project: FX_PROJECT, inputs: state.inputs.map((i) => ({ ...i, tenant_id: "acct_fixture", project_id: "proj_fx", snapshot_size: 100, snapshot_content_type: "image/png" })), versions: [] });
   }
   if (p === "/api/v1/batches" && req.method === "GET") {
     const batches = state.scenario === "empty" ? [] : [{
@@ -137,9 +155,13 @@ const server = http.createServer(async (req, res) => {
     }];
     return json(res, 200, { batches, next_cursor: "" });
   }
+  // V1/V2 are the HUI-2596 local-edit fixture versions. V3 is appended only
+  // when the plate candidate is explicitly adopted through the real-shaped
+  // endpoint below; nothing here pretends a supplier edited pixels.
   const revLabels = () => [
     { label: "V1", outcome: "succeeded", action: "simplify_background", region: "background", incremental_cost_cents: 30, brief_version: "bv_1" },
     { label: "V2", outcome: "succeeded", action: "outdoor", region: "background", incremental_cost_cents: 30, brief_version: "bv_2" },
+    ...(state.revision.plateAdopted ? [{ label: "V3", outcome: "candidate", action: "adopt", region: "none", origin: "plate_lock", incremental_cost_cents: 0, brief_version: "" }] : []),
   ];
   const revState = () => ({ adopted_label: state.revision.adopted, versions: revLabels() });
   // 局部编辑整体未开放(真实栈 = FEATURE_SELECTIVE_REVISION=0 → 路由不注册 → 404)。

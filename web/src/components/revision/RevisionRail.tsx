@@ -74,6 +74,7 @@ function fileToB64(file: File): Promise<string> {
 
 export function RevisionRail({ projectId }: { projectId?: string }) {
   const [closed, setClosed] = useState<boolean | null>(null);
+  const [editClosed, setEditClosed] = useState(false);
   const [versions, setVersions] = useState<VersionView[]>([]);
   const [adopted, setAdopted] = useState("");
   const [notice, setNotice] = useState("");
@@ -122,7 +123,28 @@ export function RevisionRail({ projectId }: { projectId?: string }) {
   }, [applyState, projectId]);
 
   useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/capabilities", { cache: "no-store" });
+        const data = (await res.json().catch(() => null)) as { selective_revision?: boolean } | null;
+        if (!cancelled && res.ok && data?.selective_revision === false) setEditClosed(true);
+      } catch {
+        // Keep the probe-on-use fallback; a failed read must not invent a grant.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     void load();
+    // Candidate adoption moves the same revision-ledger pointer; this is a
+    // refresh signal, not a second source of truth.
+    const refresh = () => void load();
+    window.addEventListener("pimage:revisions-changed", refresh);
+    return () => window.removeEventListener("pimage:revisions-changed", refresh);
   }, [load]);
 
   async function plan(body: { click?: string; text?: string }) {
@@ -139,7 +161,10 @@ export function RevisionRail({ projectId }: { projectId?: string }) {
       });
       const intentBody = await intent.json().catch(() => null);
       if (intent.status === 404) {
-        setClosed(true);
+        // Version reading is available (plate adoption), but the local-edit
+        // creation endpoints are not registered in this environment.
+        setEditClosed(true);
+        setNotice("局部修改在这个环境还没有打开；版本仍可查看、采用和回退。不会假装已经改好。");
         return;
       }
       if (!intent.ok) {
@@ -194,6 +219,11 @@ export function RevisionRail({ projectId }: { projectId?: string }) {
         }),
       });
       const data = await res.json().catch(() => null);
+      if (res.status === 404) {
+        setEditClosed(true);
+        setNotice("局部修改在这个环境还没有打开；不会假装已经改好，也不会产生新版本。");
+        return;
+      }
       if (!res.ok || data?.degraded === true || data?.redrawn === false) {
         setNotice(data?.degraded === true || data?.redrawn === false
           ? "这一处现在不能改。原图保持原样，没有新的结果，也不会另扣费用。"
@@ -295,7 +325,7 @@ export function RevisionRail({ projectId }: { projectId?: string }) {
   const labels = versions.map((v) => v.label).filter((v): v is string => !!v);
 
   return (
-    <section id="revision" className="card" aria-label="只改这里" data-revision={closed ? "closed" : projectId ? "open" : "empty"}>
+    <section id="revision" className="card" aria-label="只改这里" data-revision={closed ? "closed" : projectId ? "open" : "empty"} data-revision-edit={editClosed ? "closed" : "open"}>
       <h2>只改这里</h2>
       <p className="muted">锁定商品，只改背景或光影。已有版本可以比较、采用或回到上一版。</p>
       {!projectId ? (
@@ -314,6 +344,12 @@ export function RevisionRail({ projectId }: { projectId?: string }) {
         </div>
       ) : (
         <>
+          {editClosed ? (
+            <div className="banner warn" data-testid="revision-edit-closed">
+              局部修改在这个环境还没有打开。版本仍可查看、采用、回退；不会假装已经改好，也不会产生新版本。
+            </div>
+          ) : (
+          <>
           <div className="media-actions">
             {CLICKS.map((item) => (
               <button
@@ -365,6 +401,9 @@ export function RevisionRail({ projectId }: { projectId?: string }) {
               </div>
             </>
           ) : notice ? <p role="status">{notice}</p> : null}
+          </>
+          )}
+          {editClosed && notice ? <p role="status">{notice}</p> : null}
           <h3>版本</h3>
           {versions.length === 0 ? <p className="muted">还没有版本。做出结果后，采用状态会标在这里。</p> : (
             <ul className="asset-strip">

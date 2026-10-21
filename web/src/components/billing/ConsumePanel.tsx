@@ -1,13 +1,13 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { estimateShown, type CompletionLevels } from "@/lib/consume";
+import { estimateShown, topupHref, type CompletionLevels } from "@/lib/consume";
 
 export type ConsumePanelProps = {
   payerDisplay: string;
   presentation: string;
   generateAllowed: boolean;
   mustRequote: boolean;
-  topup?: { entry: string; returnTarget: string; quoteRef: string } | null;
+  topup?: { entry: string; returnTarget: string; quoteRef: string; billingCenterUrl?: string } | null;
   levels: CompletionLevels;
   connection?: string;
   settlement?: string;
@@ -20,6 +20,7 @@ export type ConsumePanelProps = {
 export function ConsumePanel(props: ConsumePanelProps) {
   const topup = props.topup;
   const presentation = estimateShown(props.presentation, props.quoted);
+  const href = topup ? topupHref(topup.billingCenterUrl, topup.returnTarget, topup.quoteRef) : null;
   return (
     <section
       data-consume-panel="true"
@@ -45,14 +46,23 @@ export function ConsumePanel(props: ConsumePanelProps) {
         </Button>
       ) : null}
       {topup ? (
-        <p>
-          余额不足。请从统一充值入口返回后重新确认报价。
-          <a
-            href={`/billing-center?entry=${encodeURIComponent(topup.entry)}&return_target=${encodeURIComponent(topup.returnTarget)}&quote_ref=${encodeURIComponent(topup.quoteRef)}`}
-          >
-            {topup.entry} {topup.returnTarget} {topup.quoteRef}
-          </a>
-        </p>
+        <div data-testid="topup-handoff" data-billing-entry={topup.entry}>
+          <p>余额不足。需要先充值；充值返回后必须重新确认报价，才能生成。</p>
+          {href ? (
+            <p>
+              <a className="link" href={href} rel="noreferrer" referrerPolicy="no-referrer" data-testid="billing-center-link">
+                前往统一充值
+              </a>
+            </p>
+          ) : (
+            <p data-testid="billing-center-unregistered">
+              本环境未登记统一充值页地址，不能在这里直接打开。请从平台账户中心完成充值后回到本页；不会在本地新建钱包。
+            </p>
+          )}
+          <p className="muted">
+            入口 <code>{topup.entry}</code> · 返回位置 <code>{topup.returnTarget}</code> · 报价引用 <code>{topup.quoteRef}</code>
+          </p>
+        </div>
       ) : null}
       <p>
         完成等级 {props.levels.implementationReady} / {props.levels.integration} / {props.levels.billing} /{" "}
