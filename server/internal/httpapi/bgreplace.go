@@ -36,6 +36,9 @@ func (s *Server) handleBgCapabilities(w http.ResponseWriter, r *http.Request) {
 		"real_generation_notice":       bgreplace.RealGenerationIncomplete,
 		"delivery_readiness":           bgreplace.ReadinessInternal,
 		"honesty":                      bgreplace.HonestyNotice,
+		// HUI-3902：人像/妆面独立声明真实边界；商品保真结果不能冒充人像保真。
+		"portrait_edit":        bgreplace.PortraitCapabilities(),
+		"subject_capabilities": bgreplace.PortraitCapabilities(),
 	})
 }
 

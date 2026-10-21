@@ -1276,3 +1276,33 @@ func mustJSON(v any) []byte {
 	b, _ := json.Marshal(v)
 	return b
 }
+
+func TestBgCapabilitiesDeclarePortraitFidelityUnsupported(t *testing.T) {
+	f := newFixture(t, func(c *config.Config) { c.BgReplaceEnabled = true })
+	_, tok := f.loginOK(t)
+	st, body := f.do(t, "GET", "/api/v1/background-replacements/capabilities", tok, nil)
+	if st != http.StatusOK {
+		t.Fatalf("能力接口 %d %v", st, body)
+	}
+	raw, ok := body["portrait_edit"].([]any)
+	if !ok || len(raw) != 2 {
+		t.Fatalf("人像能力声明缺失: %#v", body["portrait_edit"])
+	}
+	got := map[string]map[string]any{}
+	for _, item := range raw {
+		m, _ := item.(map[string]any)
+		mode, _ := m["mode"].(string)
+		got[mode] = m
+	}
+	fid := got["fidelity"]
+	if fid == nil || fid["supported"] != false || fid["provider_supported"] != true || fid["scope"] != "provider_mask_only" || fid["pixel_locked"] != false {
+		t.Fatalf("人像保真未验证却写成支持: %#v", fid)
+	}
+	cre := got["creative"]
+	if cre == nil || cre["supported"] != true || cre["scope"] != "whole_image" || cre["preserves_identity"] != false {
+		t.Fatalf("人像创意必须声明整图且不保身份: %#v", cre)
+	}
+	if capBody, _ := body["subject_capabilities"].([]any); len(capBody) != 2 {
+		t.Fatalf("subject_capabilities 与 portrait_edit 应一致: %#v", body["subject_capabilities"])
+	}
+}
