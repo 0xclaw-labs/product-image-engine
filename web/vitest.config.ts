@@ -6,6 +6,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),
+      "@painuo/login-page": path.resolve(__dirname, "vendor/login-page/src/index.ts"),
     },
   },
   test: {

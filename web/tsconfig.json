@@ -14,8 +14,11 @@
     "jsx": "preserve",
     "incremental": true,
     "plugins": [{ "name": "next" }],
-    "paths": { "@/*": ["./src/*"] }
+    // vendor 包以 .ts 源码直发（exports 指向 src/index.ts），需要这条才允许
+    // `from "@painuo/login-page"` 解析到 .ts 入口（noEmit 下合法）。
+    "allowImportingTsExtensions": true,
+    "paths": { "@/*": ["./src/*"], "@painuo/login-page": ["./vendor/login-page/src/index.ts"] }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "vendor/login-page/test"]
 }

@@ -107,14 +107,14 @@ export default function ProjectsPage() {
           <Link className="link" href="/handoff">
             接受跨应用交接
           </Link>
-          <Button className="primary" onClick={() => setShowCreate((v) => !v)}>
+          <Button onClick={() => setShowCreate((v) => !v)}>
             {showCreate ? "收起" : "新建工程"}
           </Button>
         </div>
         {showCreate ? (
           <form onSubmit={create} className="mt-12">
             <div className="media-actions">
-              <Button className="primary" type="submit" disabled={creating}>
+              <Button type="submit" disabled={creating}>
                 {creating ? "创建中…" : "创建"}
               </Button>
             </div>

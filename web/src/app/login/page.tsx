@@ -1,88 +1,80 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { jsonBody, jsonHeaders } from "@/lib/api-client";
-import { loggedInHome } from "@/lib/first-image";
 
-// 登录页:邮箱+口令(platform-identity 派生身份,本应用不自管账号)。
+import { fetchWithRefresh } from "@/lib/api-client";
+import { firstScreen, loggedInHome } from "@/lib/first-image";
+import { SharedLogin, createBffSignIn } from "@/components/login/SharedLogin";
+
+// 登录页:左台保留产品声音(五步真实流程+诚实声明),表单本体换成生态统一
+// 组件 @painuo/login-page(vendor/login-page,亮肤见 components/login/
+// shared-login.module.css)。组件卡自带品牌头(h1「产品图」+封闭注册 tagline)。
+// 会话探测与 ?next= 防御留在宿主:?next= 只收站内路径(以单/开头,拒绝 //
+// 与外链),防 open redirect;登录提交由组件经 signIn 桥打 BFF。
+const STEPS = firstScreen().steps;
+const signIn = createBffSignIn();
+
+function safeNext(raw: string | null): string | null {
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return null;
+  return raw;
+}
+
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
+  const nextRef = useRef<string | null>(null);
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError("");
-    try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: jsonHeaders,
-        body: jsonBody({ email, password }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        setError(data?.error?.message ?? `登录失败(HTTP ${res.status})`);
-        return;
+  // 已登录访问 /login 直接送回目标页;会话检查失败(未登录/平台不可达/
+  // 网络不通)一律静默留在本页——登录页是这些失败的合法落点。
+  // D25:401 先走 fetchWithRefresh 续签一次,refresh 有效则照样送回目标页。
+  useEffect(() => {
+    nextRef.current = safeNext(
+      new URLSearchParams(window.location.search).get("next"),
+    );
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetchWithRefresh("/api/auth/session", {
+          signal: AbortSignal.timeout(10000),
+        });
+        if (!cancelled && res.ok) {
+          router.replace(nextRef.current ?? loggedInHome());
+        }
+      } catch {
+        // 未登录或不可达都留在登录页,不打扰。
       }
-      router.replace(loggedInHome());
-    } catch {
-      setError("网络异常,请稍后重试");
-    } finally {
-      setBusy(false);
-    }
-  }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   return (
     <div className="media-bench" data-layout="entry">
-      <section className="media-stage" aria-label="产品图">
+      <section className="media-stage" aria-label="登录后的流程">
         <div className="stage-empty" data-state="empty">
           <p className="stage-kicker">产品图</p>
-          <h2>先看商品，再决定改哪里</h2>
+          <h1>先看商品，再决定改哪里</h1>
           <p>登录之后从一张商品照片开始。商品本身保持不动。</p>
+          <ol className="entry-steps">
+            {STEPS.map((step) => (
+              <li key={step}>{step}</li>
+            ))}
+          </ol>
           <p className="muted">这里还没有成片。登录不会生成图片。</p>
         </div>
       </section>
       <aside className="media-rail">
-        <div className="card">
-          <h2>登录</h2>
-          <form onSubmit={submit}>
-            <div className="media-actions">
-              <Button className="primary" type="submit" disabled={busy}>
-                {busy ? (
-                  <span data-state="loading">登录中…</span>
-                ) : (
-                  "登录后开始"
-                )}
-              </Button>
-            </div>
-            <label htmlFor="login-email">邮箱</label>
-            <input
-              id="login-email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              required
-            />
-            <label htmlFor="login-password">口令</label>
-            <input
-              id="login-password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-            {error ? <div className="banner" role="alert" data-state="error">{error}</div> : null}
-          </form>
-          <p className="muted mb-0">
-            身份由平台统一派生，本应用不保存口令。
-          </p>
-        </div>
+        <SharedLogin
+          signIn={signIn}
+          onAuthenticated={() => {
+            // 成功落点:深链优先,站内性由 safeNext 收口;组件内 navigate 已置空。
+            router.replace(safeNext(nextRef.current) ?? loggedInHome());
+          }}
+        />
+        <p className="muted mt-12 mb-0">
+          身份由平台统一派生，本应用不保存口令。
+        </p>
       </aside>
     </div>
   );

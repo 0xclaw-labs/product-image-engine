@@ -79,7 +79,9 @@ const markerBook: readonly { route: string; markers: readonly Marker[] }[] = [
   // HUI-2627 fix2:/login、/projects、/projects/[id] 的行内样式已全部收敛为
   // globals.css 版式工具类(2026-10-08,gate-r2 修复轮),标记账随真实页面收缩;
   // raw 控件维持既有记账水平(见 docs/audits/hui-2627/fix2/hygiene-scan.json)。
-  { route: "/login", markers: ["raw input"] },
+  // 统一登录改造(2026-10-21):/login 表单本体收敛进 @painuo/login-page,
+  // 页面源不再含裸 <input>,记账随真实收缩为空。
+  { route: "/login", markers: [] },
   { route: "/start", markers: [] },
   { route: "/projects", markers: ["raw input", "raw table"] },
   { route: "/projects/[id]", markers: ["raw button", "raw input", "raw table"] },

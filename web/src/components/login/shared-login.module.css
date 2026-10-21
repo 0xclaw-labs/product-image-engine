@@ -1,0 +1,19 @@
+/* 产品图登录面对齐生态统一组件 @painuo/login-page 的亮色皮肤。
+   包内全部颜色走 var(--lpg-*, 缺省暗色)，只在挂载点祖先覆写变量即可换肤，
+   版式是包契约（「禁改版式」），所以这里只给色值、不给布局规则。
+   色值全部对齐 globals.css 的本仓设计系统 token；品牌 accent 不在这里覆写——
+   由 SharedLogin 经 brand.accent 注入（--accent/--accent-hover/--accent-weak），
+   组件卡之外的收尾文案复用页面全局工具类（muted/mt-12/mb-0）。 */
+.light {
+  color-scheme: light;
+  --lpg-bg-base: var(--bg);
+  --lpg-bg-panel: var(--card);
+  --lpg-bg-raised: var(--card);
+  --lpg-bg-sunken: var(--bg);
+  --lpg-line: var(--border);
+  --lpg-fg: var(--text);
+  --lpg-fg-muted: var(--muted);
+  --lpg-fg-faint: var(--muted);
+  --lpg-danger: var(--danger);
+  --lpg-danger-weak: var(--danger-bg);
+}
