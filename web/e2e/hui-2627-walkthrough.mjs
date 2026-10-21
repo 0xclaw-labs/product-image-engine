@@ -35,16 +35,21 @@ await anonPage.goto(`${WEB}/login`);
 await anonPage.waitForLoadState("networkidle").catch(() => {});
 await anonPage.screenshot({ path: path.join(OUT, "browser", "2627-login-1440.png"), fullPage: true });
 const loginFormTop = await anonPage.evaluate(() => {
-  const btn = [...document.querySelectorAll("button, [role=button], input[type=submit]")].find((b) => /登录|开始/.test(b.textContent ?? ""));
+  // 统一组件契约:登录表单只有一枚 submit 主操作,文案恰为「登录」。
+  const btn = [...document.querySelectorAll("button[type=submit]")].find((b) => (b.textContent ?? "").trim() === "登录");
   const form = btn?.closest("form");
   if (!btn || !form) return { found: false };
-  const formTop = form.getBoundingClientRect().top, btnTop = btn.getBoundingClientRect().top;
+  const btnTop = btn.getBoundingClientRect().top;
   const inputs = [...form.querySelectorAll("input")].filter((i) => i.type !== "hidden");
-  const firstInput = inputs[0]?.getBoundingClientRect().top ?? btnTop;
-  return { found: true, button_before_first_input: btnTop <= firstInput + 8, label: btn.textContent.trim() };
+  if (!inputs.length) return { found: false };
+  // 字段在前、提交在后:主操作必须在全部输入之下(延续 D24,口径从
+  // 「第一个输入之后」收紧为「全部输入之后」,统一组件版式保证)。
+  const lastInputBottom = Math.max(...inputs.map((i) => i.getBoundingClientRect().bottom));
+  return { found: true, inputs: inputs.length, button_after_inputs: btnTop >= lastInputBottom - 8, label: btn.textContent.trim() };
 });
 save("login-primary-action.json", loginFormTop);
-if (!loginFormTop.found || !loginFormTop.button_before_first_input) note("fail", "login primary action is not at the top of the form");
+if (!loginFormTop.found || !loginFormTop.button_after_inputs) note("fail", "login primary action is not after the inputs (unified component contract, D24)");
+else note("ok", `login primary action "${loginFormTop.label}" sits after ${loginFormTop.inputs} inputs`);
 await anonCtx.close();
 
 // B. Logged in.
