@@ -116,7 +116,7 @@ func (s *Server) handleMotionBatchRerun(w http.ResponseWriter, r *http.Request) 
 		writeMotionErr(w, err)
 		return
 	}
-	writeErr(w, http.StatusConflict, "batch_rerun_unproven", "HUI-2732 未完成，不能证明其他变体的执行次数为 0，所以不批量重跑。还没生成成片。")
+	writeErr(w, http.StatusConflict, "batch_rerun_unproven", "批量重跑尚未开放：还不确定其他版本是否执行过，为避免重复扣费暂不批量重跑。还没生成成片。")
 }
 
 func adoptedMotionAsset(led *revision.Ledger, revisionID string) (motionref.AdoptedAsset, error) {
@@ -159,7 +159,7 @@ func writeMotionErr(w http.ResponseWriter, err error) {
 	case errors.Is(err, motionref.ErrUnverifiedAd):
 		writeErr(w, http.StatusConflict, "not_a_dynamic_ad", "还没生成成片。没有核验过的引用不能当成动态广告。")
 	case errors.Is(err, motionref.ErrBatchUnproven):
-		writeErr(w, http.StatusConflict, "batch_rerun_unproven", "HUI-2732 未完成，不能证明其他变体的执行次数为 0，所以不批量重跑。还没生成成片。")
+		writeErr(w, http.StatusConflict, "batch_rerun_unproven", "批量重跑尚未开放：还不确定其他版本是否执行过，为避免重复扣费暂不批量重跑。还没生成成片。")
 	case errors.Is(err, motionref.ErrDrift), errors.Is(err, store.ErrConflict):
 		writeErr(w, http.StatusConflict, "subject_unchanged", "主体哈希不能改。还没生成成片。")
 	case errors.Is(err, motionref.ErrDigest):

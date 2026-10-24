@@ -246,7 +246,7 @@ func (s *Server) handleCreateBatch(w http.ResponseWriter, r *http.Request) {
 	for i, f := range req.Items {
 		data, err := base64.StdEncoding.DecodeString(f.DataB64)
 		if err != nil || len(data) == 0 {
-			writeErr(w, http.StatusBadRequest, "invalid_request", fmt.Sprintf("items[%d].data_b64 必须是非空 base64", i))
+			writeErr(w, http.StatusBadRequest, "invalid_request", fmt.Sprintf("第 %d 张图片数据格式不正确，请重新上传", i+1))
 			return
 		}
 		if _, err := sizeadapt.DecodePNG(data); err != nil {

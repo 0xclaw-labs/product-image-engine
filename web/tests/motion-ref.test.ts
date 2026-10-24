@@ -21,7 +21,7 @@ describe("Motion 引用不是成片", () => {
   it("页面文案写明还没生成成片，并且没有编辑器或批量重跑", () => {
     const src = readFileSync(path.join(process.cwd(), "src/components/motion-ref/MotionRefNote.tsx"), "utf8");
     expect(src).toContain("还没生成成片");
-    expect(src).toContain("HUI-2732");
+    expect(src).toContain("批量重跑尚未开放");
     expect(src).not.toContain("<video");
     expect(src).not.toContain("batch-rerun");
     expect(src).not.toContain("已生成成片");

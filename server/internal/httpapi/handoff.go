@@ -499,7 +499,7 @@ func (s *Server) handleRegisterOutput(w http.ResponseWriter, r *http.Request) {
 	}
 	data, err := base64.StdEncoding.DecodeString(req.DataB64)
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, "invalid_request", "data_b64 必须是非空 base64")
+		writeErr(w, http.StatusBadRequest, "invalid_request", "图片数据格式不正确，请重新上传")
 		return
 	}
 	ctx := r.Context()
@@ -564,7 +564,7 @@ func (s *Server) registerOutputBytes(ctx context.Context, tenant, projID, fileNa
 // return action of exactly the run that derived them (plateRun).
 func (s *Server) registerOutputBytesFor(ctx context.Context, tenant, projID, fileName, contentType string, data []byte, enrich outputContextEnricher, plateRun string) (store.ProjectOutput, bool, *apiErr) {
 	if len(data) == 0 {
-		return store.ProjectOutput{}, false, &apiErr{http.StatusBadRequest, "invalid_request", "data_b64 必须是非空 base64"}
+		return store.ProjectOutput{}, false, &apiErr{http.StatusBadRequest, "invalid_request", "图片数据格式不正确，请重新上传"}
 	}
 	if len(data) > 8<<20 {
 		return store.ProjectOutput{}, false, &apiErr{http.StatusRequestEntityTooLarge, "too_large", "测试用合法图片上限 8 MiB"}

@@ -20,7 +20,7 @@ describe("source screen honest quote/result", () => {
   it("refund/deletion keep original expense and unknown cleanup and human facts", () => {
     const r = quoted(); r.deleted = true; r.payment.status = "refunded"; r.payment.original_charged_minor = "25"; r.payment.original_charge_id = "charge_a"; r.payment.refund_id = "refund_a";
     const html = renderToStaticMarkup(createElement(SourceImageScreen, { view: r, capabilities: capabilities(), nowUnix: 1700000001, projectID: "proj_a" }));
-    expect(html).toContain("原扣款 ¥0.25"); expect(html).toContain("charge_a"); expect(html).toContain("refund_a"); expect(html).toContain("退款金额待核实"); expect(html).toContain("引用清理待核实"); expect(html).toContain("NOT_RUN"); expect(html).not.toContain("已退款 ¥0.00"); expect(html).not.toContain("/content");
+    expect(html).toContain("原扣款 ¥0.25"); expect(html).toContain("charge_a"); expect(html).toContain("refund_a"); expect(html).toContain("退款金额待核实"); expect(html).toContain("引用清理待核实"); expect(html).toContain("人工可用性：未执行"); expect(html).not.toContain("已退款 ¥0.00"); expect(html).not.toContain("/content");
   });
   it("confirmed output links remain protected source paths; quality unknown", () => {
     const r = quoted(); r.confirmed = true; r.phase = "succeeded"; r.payment.status = "charged"; r.payment.charged_minor = "25"; r.output = { asset_id: "asset_a", reference_id: "ref_a", sha256: "b".repeat(64), content_type: "image/png", size_bytes: "1024", width_px: 1024, height_px: 1024, association_verified: true };
