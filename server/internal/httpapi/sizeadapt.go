@@ -57,7 +57,7 @@ func (s *Server) handleCreateSizeVariant(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if strings.TrimSpace(req.SourceOutputID) == "" || strings.TrimSpace(req.PresetName) == "" {
-		writeErr(w, http.StatusBadRequest, "invalid_request", "source_output_id 与 preset_name 必填")
+		writeErr(w, http.StatusBadRequest, "invalid_request", "缺少必要参数，请重试")
 		return
 	}
 	format := sizeadapt.FormatPNG
@@ -70,7 +70,7 @@ func (s *Server) handleCreateSizeVariant(w http.ResponseWriter, r *http.Request)
 	}
 	data, err := base64.StdEncoding.DecodeString(req.DataB64)
 	if err != nil || len(data) == 0 {
-		writeErr(w, http.StatusBadRequest, "invalid_request", "data_b64 必须是非空 base64")
+		writeErr(w, http.StatusBadRequest, "invalid_request", "图片数据格式不正确，请重新上传")
 		return
 	}
 	if len(data) > sizeadapt.MaxInputBytes {
