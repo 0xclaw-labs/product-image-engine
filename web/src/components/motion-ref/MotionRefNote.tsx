@@ -90,7 +90,7 @@ export function MotionRefNote({ projectId }: { projectId?: string }) {
       <h2>Motion 引用</h2>
       <p className="muted">{NOT_FINISHED_COPY}</p>
       <p className="muted">不生成视频，不调用供应商，这里也没有 Motion 编辑器。</p>
-      <p className="muted">HUI-2732 未完成，不能证明其他变体的执行次数为 0，所以不批量重跑。</p>
+      <p className="muted">批量重跑尚未开放：还不确定其他版本是否执行过，为避免重复扣费暂不批量重跑。</p>
       {!projectId ? <p>还没有工程。还没生成成片。</p> : null}
       {closed ? <p>这个环境还没有打开 Motion 引用。还没生成成片。</p> : null}
       {projectId && closed === false ? (

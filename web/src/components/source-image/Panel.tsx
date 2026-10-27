@@ -12,6 +12,8 @@ type ScreenProps={ view: SourceRunView | null; capabilities: SourceCapabilities 
   onPrompt?: (v: string)=>void; onQuote?: ()=>void; onConfirm?: ()=>void; onRefresh?: ()=>void; onReload?: ()=>void; onNew?: ()=>void; onAction?: (name:"reconcile"|"cancel"|"select"|"deleteOutput")=>void; onArmDelete?: ()=>void; onHistory?: (run:string)=>void; onMore?: ()=>void;
 };
 function expiry(at: number): string { const d=new Date(at*1000); return Number.isNaN(d.getTime()) ? "到期时间待核实" : d.toISOString().replace("T"," ").replace(".000Z"," UTC"); }
+// 人工可用性枚举（服务端目前只有 NOT_RUN）主视图只出中文，未识别值不直出英文枚举。
+const HUMAN_ADOPTION_TEXT: Record<string, string> = { NOT_RUN: "未执行" };
 export function SourceImageScreen(p: ScreenProps) {
   const v=p.view, mode=p.capabilities?.modes.find(m=>m.mode === "text_generate"), q=v?.quote;
   const pay=!!v && mode?.can_confirm === true && canConfirm(v,p.nowUnix);
@@ -21,11 +23,19 @@ export function SourceImageScreen(p: ScreenProps) {
     <CardHeader><CardTitle>普通文字生成</CardTitle><CardDescription>普通概念图，不宣称商品主体保真。原输出为 1024×1024，1 张；不会改写工程原有尺寸。</CardDescription></CardHeader>
     {mode?.ready !== true ? <p role="status">{mode?.can_quote ? "报价与明确确认可用；自动结果恢复尚未配置，完整生成闭环尚不可用。" : "正式生成尚未配置或当前工程无写权限；已有记录仍需服务端授权读取。"}</p> : null}
     {p.projectID ? <><label>文字描述<textarea rows={3} value={p.prompt ?? ""} onChange={e=>p.onPrompt?.(e.target.value)} placeholder="例如：蓝色纸盒，浅灰棚拍" /></label><div className="row"><Button type="button" disabled={!!p.busy || mode?.can_quote !== true || !(p.prompt ?? "").trim()} onClick={p.onQuote}>获取报价</Button><Button type="button" variant="outline" disabled={!!p.busy} onClick={p.onNew}>明确重新生成（新请求）</Button></div></> : <Button type="button" disabled={!!p.busy} onClick={p.onQuote}>创建个人普通图工程（1024×1024）</Button>}
-    {v ? <><p>{requestState(v)}</p><p>原请求 {v.run_id}{v.task_id ? ` · Task ${v.task_id}` : ""}{v.task_phase ? ` · ${v.task_phase}` : ""}</p>
-      <p>付款人：{v.payment.payer_label} · {v.payment.payer_account_id}</p>
+    {v ? <><p>{requestState(v)}</p>
+      <p>付款人：{v.payment.payer_label}</p>
       {q ? <p>原报价 {formatMinor(q.amount_minor)} · {v.model} · {v.quantity} 张 · 1024×1024 · 到期 {expiry(q.expires_at_unix)}</p> : <p>报价未验证，金额待核实</p>}
       {pay ? <Button type="button" disabled={!!p.busy} onClick={p.onConfirm}>确认支付并生成 {formatMinor(q?.amount_minor)}</Button> : null}
-      <p>原扣款 {formatMinor(v.payment.original_charged_minor ?? v.payment.charged_minor)}{v.payment.original_charge_id || v.payment.charge_id ? ` · ${v.payment.original_charge_id || v.payment.charge_id}` : ""}</p>
+      <p>原扣款 {formatMinor(v.payment.original_charged_minor ?? v.payment.charged_minor)}</p>
+      <details data-technical="true">
+        <summary>技术详情</summary>
+        <dl>
+          <dt>请求</dt><dd>{v.run_id}{v.task_id ? ` · Task ${v.task_id}` : ""}{v.task_phase ? ` · ${v.task_phase}` : ""}</dd>
+          <dt>付款账户</dt><dd>{v.payment.payer_account_id || "待核实"}</dd>
+          <dt>扣费单号</dt><dd>{v.payment.original_charge_id || v.payment.charge_id || "待核实"}</dd>
+        </dl>
+      </details>
       {v.payment.status === "refunded" ? <p>原退款记录 {v.payment.refund_id || "编号待核实"}；{v.payment.refund_amount_minor === null ? "退款金额待核实" : formatMinor(v.payment.refund_amount_minor)}</p> : null}
       <p>当前费用{v.payment.refresh_status === "unknown" ? "待核实":"未刷新"}；核验时间{v.payment.last_verified_at === null ? "未知":expiry(v.payment.last_verified_at)}。图片出现不代表最新费用通过。</p>
       <div className="row"><Button type="button" variant="outline" disabled={!!p.busy} onClick={p.onRefresh}>读取同一记录</Button><Button type="button" variant="outline" disabled={!!p.busy || writeDenied || v.deleted} onClick={()=>p.onAction?.("reconcile")}>恢复原任务</Button><Button type="button" variant="outline" disabled={!!p.busy || writeDenied || v.cancel_requested || v.deleted} onClick={()=>p.onAction?.("cancel")}>请求取消原任务</Button></div>
@@ -33,7 +43,7 @@ export function SourceImageScreen(p: ScreenProps) {
       {v.output && !v.deleted && !output ? <Button type="button" variant="outline" disabled={!!p.busy || writeDenied} onClick={p.onArmDelete}>删除输出展示</Button> : null}
       {v.output && !v.deleted && p.deleteArmed ? <p>确认隐藏原输出并申请释放原引用。不会退款，也不代表物理文件已删除。<Button type="button" disabled={!!p.busy || writeDenied} onClick={()=>p.onAction?.("deleteOutput")}>确认删除输出展示</Button></p> : null}
       {v.deleted ? <p>输出已隐藏，引用清理待核实；没有退款或物理删除完成承诺。</p> : null}
-      <p>视觉质量待核实 · 主体保真不适用 · 人类采用 NOT_RUN</p>
+      <p>视觉质量待核实 · 主体保真不适用 · 人工可用性：{HUMAN_ADOPTION_TEXT[v.human_adoption] ?? "未核实"}</p>
     </> : <p>先取得服务端正式报价，再单独明确确认。未知费用不会按零处理。</p>}
     {p.notice ? <p role="alert">{p.notice}</p> : null}
     {p.pendingKey ? <p>待核实原请求键：{p.pendingKey}（本地仅作查找提示，事实以服务端为准）</p> : null}
