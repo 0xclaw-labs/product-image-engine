@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEven
 import { ApiFailure } from "./apiError.ts";
 import { createBuiltInAuth } from "./builtInAuth.ts";
 import { Button } from "./internal/Button.tsx";
+import { LinkButton } from "./internal/LinkButton.tsx";
 import { Segmented } from "./internal/Segmented.tsx";
 import { TextField } from "./internal/TextField.tsx";
 import type { AuthAdapter, LoginPageProps } from "./types.ts";
@@ -384,8 +385,7 @@ export function LoginPage({
         <form onSubmit={onVerify} noValidate>
           <div className={styles.echo}>
             <span className={styles.echoAddr}>{email}</span>
-            <button
-              type="button"
+            <LinkButton
               className={styles.linkBtn}
               onClick={() => {
                 setError(null);
@@ -395,7 +395,7 @@ export function LoginPage({
               disabled={busy}
             >
               改邮箱
-            </button>
+            </LinkButton>
           </div>
           <TextField
             label="验证码"
@@ -419,14 +419,13 @@ export function LoginPage({
             {remain > 0 ? (
               <span>{remain} 秒后可重发</span>
             ) : (
-              <button
-                type="button"
+              <LinkButton
                 className={styles.linkBtn}
                 onClick={() => void onResend()}
                 disabled={busy}
               >
                 重发验证码
-              </button>
+              </LinkButton>
             )}
           </p>
         </form>
@@ -457,18 +456,17 @@ export function LoginPage({
           </form>
           <p className={styles.foot}>
             {showTabs ? (
-              <button type="button" className={styles.linkBtn} onClick={() => switchTab("otp")}>
+              <LinkButton className={styles.linkBtn} onClick={() => switchTab("otp")}>
                 邮箱验证码登录
-              </button>
+              </LinkButton>
             ) : null}
             {links?.forgotPassword ? (
-              <button
-                type="button"
+              <LinkButton
                 className={styles.linkBtn}
                 onClick={() => go(links.forgotPassword!)}
               >
                 忘记密码？
-              </button>
+              </LinkButton>
             ) : (
               <span>只有用户名时找主管理员重置。</span>
             )}
@@ -489,13 +487,12 @@ export function LoginPage({
         <p className={styles.foot}>
           <span>
             还没有账号？
-            <button
-              type="button"
+            <LinkButton
               className={styles.linkBtn}
               onClick={() => go(links.register!)}
             >
               立即注册
-            </button>
+            </LinkButton>
           </span>
         </p>
       ) : null}

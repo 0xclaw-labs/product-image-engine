@@ -1,18 +1,24 @@
 import type { HTMLAttributes, ReactNode } from "react";
-import styles from "./ui.module.css";
+import {
+  Card as ShadcnCard,
+  CardHeader as ShadcnCardHeader,
+  CardTitle as ShadcnCardTitle,
+  CardDescription as ShadcnCardDescription,
+} from "@/components/shadcn/card";
 
+// 兼容旧引用:底层实现已迁移到 shadcn/ui Card 原语,子组件接口保持不变。
 export function Card({ className, ...props }: HTMLAttributes<HTMLElement>) {
-  return <section className={[styles.card, className].filter(Boolean).join(" ")} {...props} />;
+  return <ShadcnCard className={className} {...props} />;
 }
 
 export function CardHeader({ children }: { children: ReactNode }) {
-  return <header style={{ marginBottom: 12 }}>{children}</header>;
+  return <ShadcnCardHeader>{children}</ShadcnCardHeader>;
 }
 
 export function CardTitle({ children }: { children: ReactNode }) {
-  return <h2 className={styles.title}>{children}</h2>;
+  return <ShadcnCardTitle>{children}</ShadcnCardTitle>;
 }
 
 export function CardDescription({ children }: { children: ReactNode }) {
-  return <p className={styles.desc}>{children}</p>;
+  return <ShadcnCardDescription>{children}</ShadcnCardDescription>;
 }

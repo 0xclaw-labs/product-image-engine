@@ -85,8 +85,8 @@ const markerBook: readonly { route: string; markers: readonly Marker[] }[] = [
   { route: "/start", markers: [] },
   { route: "/projects", markers: ["raw input", "raw table"] },
   { route: "/projects/[id]", markers: ["raw button", "raw input", "raw table"] },
-  { route: "/batches", markers: ["inline style", "raw button", "raw input", "raw table"] },
-  { route: "/handoff", markers: ["inline style", "raw button", "raw input", "raw table"] },
+  { route: "/batches", markers: ["inline style", "raw input", "raw table"] },
+  { route: "/handoff", markers: ["inline style", "raw table"] },
 ];
 
 function sameMarkers(recorded: readonly Marker[], scanned: readonly Marker[]): boolean {

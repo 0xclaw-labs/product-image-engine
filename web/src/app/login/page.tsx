@@ -1,17 +1,19 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { fetchWithRefresh } from "@/lib/api-client";
 import { firstScreen, loggedInHome } from "@/lib/first-image";
 import { SharedLogin, createBffSignIn } from "@/components/login/SharedLogin";
+import { Alert, AlertDescription } from "@/components/shadcn/alert";
+import { Button } from "@/components/shadcn/button";
 
-// 登录页:左台保留产品声音(五步真实流程+诚实声明),表单本体换成生态统一
-// 组件 @painuo/login-page(vendor/login-page,亮肤见 components/login/
-// shared-login.module.css)。组件卡自带品牌头(h1「产品图」+封闭注册 tagline)。
-// 会话探测与 ?next= 防御留在宿主:?next= 只收站内路径(以单/开头,拒绝 //
-// 与外链),防 open redirect;登录提交由组件经 signIn 桥打 BFF。
+// 登录页:左台保留产品声音(五步真实流程+诚实声明),表单本体是生态统一组件
+// @painuo/login-page(vendor/login-page)。组件卡自带品牌头(h1「产品图」+封闭
+// 注册 tagline)。会话探测与 ?next= 防御留在宿主:?next= 只收站内路径(以单/
+// 开头,拒绝 // 与外链),防 open redirect;登录提交由组件经 signIn 桥打 BFF。
+// 会话异常给可见错误面与重试,不静默;vendor 表单始终挂载,不被骨架/错误替换。
 const STEPS = firstScreen().steps;
 const signIn = createBffSignIn();
 
@@ -23,31 +25,34 @@ function safeNext(raw: string | null): string | null {
 export default function LoginPage() {
   const router = useRouter();
   const nextRef = useRef<string | null>(null);
+  const [sessionError, setSessionError] = useState("");
+  const [probing, setProbing] = useState(true);
 
-  // 已登录访问 /login 直接送回目标页;会话检查失败(未登录/平台不可达/
-  // 网络不通)一律静默留在本页——登录页是这些失败的合法落点。
-  // D25:401 先走 fetchWithRefresh 续签一次,refresh 有效则照样送回目标页。
+  const probeSession = useCallback(async () => {
+    setSessionError("");
+    setProbing(true);
+    try {
+      const res = await fetchWithRefresh("/api/auth/session", {
+        signal: AbortSignal.timeout(10000),
+      });
+      if (res.ok) {
+        router.replace(nextRef.current ?? loggedInHome());
+      } else if (res.status !== 401) {
+        setSessionError("暂时无法确认登录状态，仍可在下方尝试登录。");
+      }
+    } catch {
+      setSessionError("网络连接失败，暂时无法确认登录状态，请检查网络后重试。");
+    } finally {
+      setProbing(false);
+    }
+  }, [router]);
+
   useEffect(() => {
     nextRef.current = safeNext(
       new URLSearchParams(window.location.search).get("next"),
     );
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetchWithRefresh("/api/auth/session", {
-          signal: AbortSignal.timeout(10000),
-        });
-        if (!cancelled && res.ok) {
-          router.replace(nextRef.current ?? loggedInHome());
-        }
-      } catch {
-        // 未登录或不可达都留在登录页,不打扰。
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [router]);
+    void probeSession();
+  }, [probeSession]);
 
   return (
     <div className="media-bench" data-layout="entry">
@@ -65,6 +70,21 @@ export default function LoginPage() {
         </div>
       </section>
       <aside className="media-rail">
+        {sessionError ? (
+          <Alert variant="destructive" role="alert" className="mb-3">
+            <AlertDescription className="flex flex-wrap items-center gap-3">
+              {sessionError}
+              <Button type="button" size="sm" variant="outline" onClick={() => void probeSession()}>
+                重试
+              </Button>
+            </AlertDescription>
+          </Alert>
+        ) : null}
+        {probing ? (
+          <p role="status" className="muted mb-3 text-sm">
+            正在检查登录状态…
+          </p>
+        ) : null}
         <SharedLogin
           signIn={signIn}
           onAuthenticated={() => {

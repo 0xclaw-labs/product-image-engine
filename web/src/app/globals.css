@@ -472,3 +472,35 @@ p .link,
   line-height: var(--pn-type-title-line-height);
   font-weight: var(--pn-type-title-weight);
 }
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* shadcn/ui 语义令牌:全部映射到既有 --pn-* 品牌令牌,不引入第二套色板。 */
+  --background: var(--pn-bg-page);
+  --foreground: var(--pn-text-primary);
+  --card: var(--pn-bg-surface);
+  --card-foreground: var(--pn-text-primary);
+  --popover: var(--pn-bg-surface);
+  --popover-foreground: var(--pn-text-primary);
+  --primary: var(--pn-brand-accent);
+  --primary-foreground: var(--pn-brand-ink);
+  --secondary: var(--pn-brand-weak);
+  --secondary-foreground: var(--pn-text-primary);
+  --muted: var(--pn-bg-sunken);
+  --muted-foreground: var(--pn-text-muted);
+  --accent: var(--pn-brand-weak);
+  --accent-foreground: var(--pn-text-primary);
+  --destructive: var(--pn-status-danger-solid);
+  --destructive-foreground: var(--pn-status-danger-ink);
+  --success: var(--pn-status-success-solid);
+  --success-foreground: var(--pn-status-success-ink);
+  --warning: var(--pn-status-warning-solid);
+  --warning-foreground: var(--pn-status-warning-ink);
+  --border: var(--pn-border-default);
+  --input: var(--pn-border-default);
+  --ring: var(--pn-border-focus);
+  --radius: var(--pn-radius-card);
+}

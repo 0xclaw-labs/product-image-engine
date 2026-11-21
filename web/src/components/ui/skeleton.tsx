@@ -1,7 +1,2 @@
-import type { HTMLAttributes } from "react";
-import styles from "./ui.module.css";
-
-// Skeleton is decorative loading filler; the live status text carries meaning.
-export function Skeleton({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div aria-hidden="true" className={[styles.skeleton, className].filter(Boolean).join(" ")} {...props} />;
-}
+// 兼容旧引用:底层实现为 shadcn/ui Skeleton 原语。
+export { Skeleton } from "@/components/shadcn/skeleton";

@@ -4,7 +4,15 @@
 // 只创建/恢复工程,绝不触发生成;新版需求返回待采用差异,由用户确认后采用。
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/shadcn/alert";
+import { Textarea } from "@/components/shadcn/textarea";
+import { Skeleton } from "@/components/shadcn/skeleton";
 
 interface SourceContext {
   source_kind?: string;
@@ -41,6 +49,8 @@ interface Diff {
   new?: DiffSide;
 }
 
+type SessionState = "loading" | "ready" | "error";
+
 export default function HandoffPage() {
   const router = useRouter();
   const [docText, setDocText] = useState("");
@@ -58,21 +68,38 @@ export default function HandoffPage() {
     diff?: Diff;
   } | null>(null);
   const [adopting, setAdopting] = useState(false);
-  const [adoptMsg, setAdoptMsg] = useState("");
+  const [adoptNotice, setAdoptNotice] = useState<{
+    kind: "success" | "error";
+    text: string;
+  } | null>(null);
+  const [sessionState, setSessionState] = useState<SessionState>("loading");
+
+  const probeSession = useCallback(async () => {
+    setSessionState("loading");
+    try {
+      const s = await fetch("/api/auth/session", {
+        signal: AbortSignal.timeout(10000),
+      });
+      if (s.status === 401) {
+        router.replace("/login");
+        return;
+      }
+      setSessionState(s.ok ? "ready" : "error");
+    } catch {
+      setSessionState("error");
+    }
+  }, [router]);
 
   useEffect(() => {
-    (async () => {
-      const s = await fetch("/api/auth/session");
-      if (s.status === 401) router.replace("/login");
-    })();
-  }, [router]);
+    void probeSession();
+  }, [probeSession]);
 
   async function accept(e: React.FormEvent) {
     e.preventDefault();
     setAccepting(true);
     setError("");
     setResult(null);
-    setAdoptMsg("");
+    setAdoptNotice(null);
     try {
       let doc: unknown;
       try {
@@ -92,6 +119,8 @@ export default function HandoffPage() {
         return;
       }
       setResult(data);
+    } catch {
+      setError("网络连接失败，请检查网络后重试。");
     } finally {
       setAccepting(false);
     }
@@ -100,7 +129,7 @@ export default function HandoffPage() {
   async function adopt() {
     if (!result?.binding?.id || !result.pending_snapshot?.id) return;
     setAdopting(true);
-    setAdoptMsg("");
+    setAdoptNotice(null);
     try {
       const res = await fetch(`/api/bindings/${result.binding.id}/adopt`, {
         method: "POST",
@@ -109,21 +138,42 @@ export default function HandoffPage() {
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
-        setAdoptMsg(data?.error?.message ?? `采用失败(HTTP ${res.status})`);
+        setAdoptNotice({
+          kind: "error",
+          text: data?.error?.message ?? `采用失败(HTTP ${res.status})`,
+        });
         return;
       }
-      setAdoptMsg("已采用新版需求(人工编辑与已选输出保留)");
+      setAdoptNotice({
+        kind: "success",
+        text: "已采用新版需求(人工编辑与已选输出保留)",
+      });
       setResult({ ...result, pending_snapshot: undefined, diff: undefined });
+    } catch {
+      setAdoptNotice({
+        kind: "error",
+        text: "网络连接失败，请检查网络后重试。",
+      });
     } finally {
       setAdopting(false);
     }
   }
 
   const ctx = result?.source_context;
+  // 素材不丢失:只有带稳定 asset_ref 的条目才按「引用+类型」去重;
+  // 缺少 asset_ref 的素材无法判定为同一对象,逐条保留,绝不合并不同素材。
+  const seenRefs = new Set<string>();
+  const uniqueAssets = (ctx?.assets ?? []).filter((a) => {
+    if (!a.asset_ref) return true;
+    const key = `${a.asset_ref}::${a.media_type ?? ""}`;
+    if (seenRefs.has(key)) return false;
+    seenRefs.add(key);
+    return true;
+  });
 
   return (
     <div>
-      <div className="card">
+      <Card className="card">
         <div className="row" style={{ alignItems: "center" }}>
           <h2 style={{ flex: 1, margin: 0 }}>接受跨应用交接</h2>
           <Link className="link" href="/projects">
@@ -133,15 +183,37 @@ export default function HandoffPage() {
         <p className="muted" style={{ marginTop: 4 }}>
           粘贴来源应用下发的交接文档。接受只会创建或恢复工程，不会因此自动做图或扣费。
         </p>
+
+        {sessionState === "error" ? (
+          <Alert variant="destructive" role="alert" className="mt-3">
+            <AlertDescription className="flex flex-wrap items-center gap-3">
+              无法检查登录状态，请刷新或重试；仍不可用时回到工程列表继续。
+              <Button type="button" size="sm" variant="outline" onClick={() => void probeSession()}>
+                重试
+              </Button>
+            </AlertDescription>
+          </Alert>
+        ) : null}
+
+        {sessionState === "loading" ? (
+          <div role="status" className="mt-3">
+            <Skeleton className="h-10 w-full" />
+            <p className="muted mt-2">正在检查登录状态…</p>
+          </div>
+        ) : null}
+
         <form onSubmit={accept} style={{ marginTop: 12 }}>
           <div className="media-actions">
-            <button className="primary" type="submit" disabled={accepting}>
+            <Button
+              type="submit"
+              disabled={accepting || sessionState !== "ready" || !docText.trim() || !purpose.trim()}
+            >
               {accepting ? "接受中…" : "接受交接"}
-            </button>
+            </Button>
           </div>
           <div>
             <label htmlFor="handoff-doc">交接文档</label>
-            <textarea
+            <Textarea
               id="handoff-doc"
               rows={10}
               value={docText}
@@ -153,7 +225,7 @@ export default function HandoffPage() {
           <div className="row" style={{ marginTop: 8 }}>
             <div>
               <label htmlFor="handoff-purpose">用途</label>
-              <input
+              <Input
                 id="handoff-purpose"
                 value={purpose}
                 onChange={(e) => setPurpose(e.target.value)}
@@ -162,15 +234,24 @@ export default function HandoffPage() {
             </div>
           </div>
         </form>
-        {error ? <div className="banner">{error}</div> : null}
-      </div>
+        {error ? (
+          <Alert variant="destructive" role="alert" className="mt-3">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : null}
+      </Card>
 
       {result ? (
-        <div className="card">
+        <Card className="card">
           <h2>续接结果</h2>
+          <p role="status" className="muted" aria-live="polite">
+            交接文档已接受，工程已创建或恢复；此处只展示带入的素材与需求版本。
+          </p>
           <p>
-            <span className="pill">{result.resolution}</span>{" "}
-            <span className="pill">{result.snapshot_resolution}</span>{" "}
+            {result.resolution ? <Badge variant="secondary">{result.resolution}</Badge> : null}{" "}
+            {result.snapshot_resolution ? (
+              <Badge variant="secondary">{result.snapshot_resolution}</Badge>
+            ) : null}{" "}
             {result.project ? (
               <Link className="link" href={`/projects/${result.project.id}`}>
                 打开工程:{result.project.name}
@@ -201,12 +282,12 @@ export default function HandoffPage() {
             <div>
               <dt>素材</dt>
               <dd>
-                {(ctx?.assets ?? []).length === 0
+                {uniqueAssets.length === 0
                   ? "—"
-                  : (ctx?.assets ?? []).map((a, i) => (
-                      <span className="pill" key={i}>
+                  : uniqueAssets.map((a, i) => (
+                      <Badge key={`${a.asset_ref ?? i}-${a.media_type ?? ""}`} variant="outline">
                         {a.asset_ref || "未命名素材"}
-                      </span>
+                      </Badge>
                     ))}
               </dd>
             </div>
@@ -244,7 +325,7 @@ export default function HandoffPage() {
                 </tr>
                 <tr>
                   <th>素材</th>
-                  <td>{(ctx?.assets ?? []).length}</td>
+                  <td>{uniqueAssets.length}</td>
                 </tr>
                 <tr>
                   <th>授权范围</th>
@@ -259,9 +340,9 @@ export default function HandoffPage() {
               <h3>新版需求待采用</h3>
               <p className="muted">这里并排的是需求文字，不是成片。成片比较在工程里。</p>
               <div className="media-actions">
-                <button className="primary" onClick={adopt} disabled={adopting}>
+                <Button onClick={adopt} disabled={adopting}>
                   {adopting ? "采用中…" : "确认差异并采用新版"}
-                </button>
+                </Button>
                 {result.project ? <Link className="link" href={`/projects/${result.project.id}#compare`}>去工程里并排看图</Link> : null}
               </div>
               <ul className="asset-strip" aria-label="需求差异">
@@ -310,10 +391,21 @@ export default function HandoffPage() {
                   </tbody>
                 </table>
               </details>
-              {adoptMsg ? <p className="muted">{adoptMsg}</p> : null}
             </div>
           ) : null}
-        </div>
+          {adoptNotice?.kind === "error" ? (
+            <Alert variant="destructive" role="alert" className="mt-3">
+              <AlertDescription>{adoptNotice.text}</AlertDescription>
+            </Alert>
+          ) : null}
+          {adoptNotice?.kind === "success" ? (
+            <p role="status" className="muted mt-3">{adoptNotice.text}</p>
+          ) : null}
+        </Card>
+      ) : sessionState === "ready" ? (
+        <p className="muted" data-state="empty">
+          还没有续接结果。粘贴交接文档后，这里会展示带入的素材与需求版本。
+        </p>
       ) : null}
     </div>
   );

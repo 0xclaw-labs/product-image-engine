@@ -1,18 +1,16 @@
-import type { ButtonHTMLAttributes } from "react";
-import styles from "./ui.module.css";
+import {
+  Button as ShadcnButton,
+  type ButtonProps,
+} from "@/components/shadcn/button";
 
 type Variant = "default" | "outline" | "secondary";
 type Size = "default" | "sm";
 
-// Button 对齐 shadcn/ui 的 variant/size 接口,样式限定在本模块,避免改写全站按钮。
+// 兼容旧引用:底层实现已迁移到 shadcn/ui 原语,variant/size 接口保持不变。
 export function Button({
   variant = "default",
   size = "default",
-  className,
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: Size }) {
-  const names = [styles.btn, size === "sm" ? styles.sm : "", variant === "outline" ? styles.outline : "", variant === "secondary" ? styles.secondary : "", className]
-    .filter(Boolean)
-    .join(" ");
-  return <button className={names} {...props} />;
+}: ButtonProps & { variant?: Variant; size?: Size }) {
+  return <ShadcnButton variant={variant} size={size} {...props} />;
 }
