@@ -183,6 +183,7 @@ Web(`web`,样例 `deploy/web.env.example`):
 
 ## 红线对照(public-ai checklist v3.1 / ADR 0001)
 
+- **发布纪律(DEPLOY-STANDARD-2026-11-13)**:本仓尚无 CI 发布入口(当前人工上 Primary A)。待建 `.github/workflows/deploy.yml`(push main → CI 全绿 → 自动部署;凭据=专用部署钥匙 `ci-deploy-120`,repo secret `VPS_DEPLOY_KEY`)前,人工发布逐次留痕;**个人/机器散钥匙不参与发布**。
 - 前端只打产品 BFF(`/api/*`);BFF→Go→平台,全部 loopback;task/upload/notify 不出公网。
 - 每 app × 每服务专用 token;请求带 `X-App-ID` + `X-PilotSeaView-Internal-Token`。
 - 钱包主账在 billing.db,本产品零资金账本(只读 ledger 展示)。
