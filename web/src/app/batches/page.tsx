@@ -3,6 +3,12 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Alert } from "@/components/ui/alert";
+import { Skeleton } from "@/components/shadcn/skeleton";
+import { Progress } from "@/components/shadcn/progress";
 
 interface BatchCounts {
   total: number;
@@ -73,6 +79,12 @@ const ITEM_STATUS_TEXT: Record<string, string> = {
 const ACTIVE_STATUSES = new Set(["pending", "submitting", "running", "completing"]);
 const MAX_FILE_BYTES = 8 * 1024 * 1024;
 
+function progressOf(counts?: BatchCounts): number {
+  const total = counts?.total ?? 0;
+  const done = counts?.succeeded ?? 0;
+  return total > 0 ? Math.round((done / total) * 100) : 0;
+}
+
 // 批量生成面板:多文件建批 → 提交 → 轮询收集 → 重试失败/取消。
 // 全部动作都打本站 /api/batches*(BFF 纯透传),业务裁决在 Go server。
 export default function BatchesPage() {
@@ -97,27 +109,14 @@ export default function BatchesPage() {
   const [busy, setBusy] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => {
-    (async () => {
-      const s = await fetch("/api/auth/session");
-      if (s.status === 401) {
-        router.replace("/login");
-        return;
-      }
-      await reload();
-      const pr = await fetch("/api/size-adapt/presets");
-      if (pr.ok) {
-        const pd = await pr.json().catch(() => null);
-        setPresetOptions((pd?.presets ?? []) as Preset[]);
-      } else {
-        setPresetOptions([]); // 尺寸适配未开:不展示预设,变体诉求自然消失
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const loadDetail = useCallback(async (batchId: string) => {
-    const res = await fetch(`/api/batches/${batchId}`);
+    let res: Response;
+    try {
+      res = await fetch(`/api/batches/${batchId}`);
+    } catch {
+      setError("网络不可用,暂时拿不到批次详情,请稍后重试。");
+      return null;
+    }
     const data = await res.json().catch(() => null);
     if (!res.ok) {
       setError(data?.error?.message ?? "加载批次失败");
@@ -129,13 +128,50 @@ export default function BatchesPage() {
   }, []);
 
   const reload = useCallback(async () => {
-    const res = await fetch("/api/batches");
+    let res: Response;
+    try {
+      res = await fetch("/api/batches");
+    } catch {
+      setError("网络不可用,暂时拿不到批次列表,请稍后重试。");
+      return;
+    }
     const data = await res.json().catch(() => null);
     if (!res.ok) {
       setError(data?.error?.message ?? "加载失败");
       return;
     }
     setBatches((data?.batches ?? []) as Batch[]);
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      let s: Response;
+      try {
+        s = await fetch("/api/auth/session");
+      } catch {
+        setError("网络不可用,暂时无法确认登录状态,请稍后重试。");
+        return;
+      }
+      if (s.status === 401) {
+        router.replace("/login");
+        return;
+      }
+      await reload();
+      let pr: Response;
+      try {
+        pr = await fetch("/api/size-adapt/presets");
+      } catch {
+        setPresetOptions([]);
+        return;
+      }
+      if (pr.ok) {
+        const pd = await pr.json().catch(() => null);
+        setPresetOptions((pd?.presets ?? []) as Preset[]);
+      } else {
+        setPresetOptions([]); // 尺寸适配未开:不展示预设,变体诉求自然消失
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 在途批次轮询收集(5s);终态自动停。
@@ -147,9 +183,13 @@ export default function BatchesPage() {
     if (!selected || !ACTIVE_STATUSES.has(selected.status)) return;
     const id = selected.id;
     pollRef.current = setInterval(async () => {
-      await fetch(`/api/batches/${id}/collect`, { method: "POST" });
-      const b = await loadDetail(id);
-      if (b && !ACTIVE_STATUSES.has(b.status)) await reload();
+      try {
+        await fetch(`/api/batches/${id}/collect`, { method: "POST" });
+        const b = await loadDetail(id);
+        if (b && !ACTIVE_STATUSES.has(b.status)) await reload();
+      } catch {
+        // 轮询网络抖动:下一个周期再收集,不打断页面。
+      }
     }, 5000);
     return () => {
       if (pollRef.current) {
@@ -208,6 +248,8 @@ export default function BatchesPage() {
       await reload();
       const batchId = (data?.batch as Batch | undefined)?.id;
       if (batchId) await loadDetail(batchId);
+    } catch {
+      setError("网络连接失败，批次未创建，请检查网络后重试。");
     } finally {
       setCreating(false);
     }
@@ -232,6 +274,8 @@ export default function BatchesPage() {
       if (data?.note) setNote(String(data.note));
       await loadDetail(selected.id);
       await reload();
+    } catch {
+      setError("网络连接失败，操作未完成，请检查网络后重试。");
     } finally {
       setBusy(false);
     }
@@ -249,14 +293,14 @@ export default function BatchesPage() {
         </div>
         <form onSubmit={create} style={{ marginTop: 12 }}>
           <div className="media-actions">
-            <button className="primary" type="submit" disabled={creating}>
+            <Button type="submit" disabled={creating}>
               {creating ? "建批中…" : `建批(${files.length} 个文件)`}
-            </button>
+            </Button>
           </div>
           <div className="row">
             <div>
               <label htmlFor="batch-name">批次名称</label>
-              <input
+              <Input
                 id="batch-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -266,7 +310,7 @@ export default function BatchesPage() {
             </div>
             <div>
               <label htmlFor="batch-files">产品图(PNG,≤8MiB,可多选)</label>
-              <input
+              <Input
                 id="batch-files"
                 type="file"
                 accept="image/png"
@@ -278,7 +322,7 @@ export default function BatchesPage() {
           <div className="row">
             <div>
               <label htmlFor="batch-scenes">场景(逗号分隔)</label>
-              <input
+              <Input
                 id="batch-scenes"
                 value={scenes}
                 onChange={(e) => setScenes(e.target.value)}
@@ -287,7 +331,7 @@ export default function BatchesPage() {
             </div>
             <div>
               <label htmlFor="batch-usage-note">备注用途(可选)</label>
-              <input
+              <Input
                 id="batch-usage-note"
                 value={usageNote}
                 onChange={(e) => setUsageNote(e.target.value)}
@@ -329,15 +373,33 @@ export default function BatchesPage() {
             </div>
           ) : null}
         </form>
-        {error ? <div className="banner">{error}</div> : null}
-        {note ? <div className="banner">{note}</div> : null}
+        {error ? (
+          <div data-state="error" className="mt-3">
+            <Alert tone="danger" role="alert">
+              <div className="flex flex-wrap items-center gap-3">
+                {error}
+                <Button type="button" size="sm" variant="outline" onClick={() => void reload()}>
+                  重试
+                </Button>
+              </div>
+            </Alert>
+          </div>
+        ) : null}
+        {note ? (
+          <Alert tone="ok" role="status" className="mt-3">
+            {note}
+          </Alert>
+        ) : null}
       </div>
 
       <div className="card">
         {batches === null ? (
-          <span className="muted">加载中…</span>
+          <div data-state="loading" role="status" className="grid gap-3">
+            <Skeleton className="h-16 w-full" />
+            <Skeleton className="h-16 w-full" />
+          </div>
         ) : batches.length === 0 ? (
-          <span className="muted">还没有批次,在上方建批后开始。</span>
+          <span className="muted" data-state="empty">还没有批次,在上方建批后开始。</span>
         ) : (
           <>
             <ul className="asset-strip" aria-label="批次">
@@ -345,16 +407,25 @@ export default function BatchesPage() {
                 <li key={b.id}>
                   <strong>{b.name}</strong>
                   <div>
-                    {STATUS_TEXT[b.status] ?? b.status}
+                    <Badge variant="secondary">
+                      {STATUS_TEXT[b.status] ?? b.status}
+                    </Badge>
                     {b.error_code ? ` (${b.error_code})` : ""}
                   </div>
                   <div>
                     {b.counts?.succeeded ?? 0}/{b.counts?.total ?? 0}
                   </div>
+                  <Progress
+                    aria-label={`${b.name} 进度`}
+                    value={progressOf(b.counts)}
+                    className="max-w-40"
+                  />
                   <div>失败 {b.counts?.failed ?? 0}</div>
                   <div>受阻 {b.counts?.blocked ?? 0}</div>
                   <div className="muted">{b.updated_at || "时间未知"}</div>
-                  <button
+                  <Button
+                    size="sm"
+                    variant="outline"
                     onClick={async () => {
                       setNote("");
                       setError("");
@@ -362,7 +433,7 @@ export default function BatchesPage() {
                     }}
                   >
                     查看
-                  </button>
+                  </Button>
                 </li>
               ))}
             </ul>
@@ -407,37 +478,45 @@ export default function BatchesPage() {
           <div className="row" style={{ alignItems: "center" }}>
             <h3 style={{ flex: 1, margin: 0 }}>
               {selected.name}
-              <span className="pill" style={{ marginLeft: 8 }}>
+              <Badge variant="secondary" style={{ marginLeft: 8 }}>
                 {STATUS_TEXT[selected.status] ?? selected.status}
                 {selected.error_code ? ` · ${selected.error_code}` : ""}
-              </span>
+              </Badge>
             </h3>
-            <button
-              className="primary"
+            <Button
               disabled={busy}
               onClick={() => action("submit")}
             >
               提交批次
-            </button>
-            <button disabled={busy} onClick={() => action("collect")}>
+            </Button>
+            <Button variant="outline" disabled={busy} onClick={() => action("collect")}>
               收集进度
-            </button>
-            <button disabled={busy} onClick={() => action("retry-failed")}>
+            </Button>
+            <Button variant="outline" disabled={busy} onClick={() => action("retry-failed")}>
               重试失败项
-            </button>
-            <button disabled={busy} onClick={() => action("cancel")}>
+            </Button>
+            <Button variant="outline" disabled={busy} onClick={() => action("cancel")}>
               取消批次
-            </button>
+            </Button>
           </div>
+          {selected.counts?.total ? (
+            <Progress
+              aria-label="当前批次进度"
+              value={progressOf(selected.counts)}
+              className="mt-3"
+            />
+          ) : null}
           {items.length === 0 ? (
-            <span className="muted">加载中…</span>
+            <span className="muted" data-state="loading">加载中…</span>
           ) : (
             <>
               <ul className="asset-strip" aria-label="批次条目">
                 {items.map((it) => (
                   <li key={it.id}>
                     <strong>{it.input_name || "未命名文件"}</strong>
-                    <div>{ITEM_STATUS_TEXT[it.status] ?? it.status}</div>
+                    <div>
+                      <Badge variant="outline">{ITEM_STATUS_TEXT[it.status] ?? it.status}</Badge>
+                    </div>
                     <div className="muted">{it.error_code || "—"}</div>
                     <div>尝试 {it.attempts}</div>
                     <div>{it.output_id ? "已登记" : "—"}</div>
