@@ -7,6 +7,10 @@ import { usePublishWorkbench } from "@/components/eco-nav/workbench";
 import { SubjectFidelityPanel } from "@/components/SubjectFidelityPanel";
 import { sourceLabel } from "@/lib/eco-nav";
 import { jsonBody, jsonHeaders } from "@/lib/api-client";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Alert } from "@/components/ui/alert";
+import { Skeleton } from "@/components/shadcn/skeleton";
 import { projectSourceLabel, projectStatusLabel } from "@/lib/project-labels";
 import styles from "./project-detail.module.css";
 import { BackgroundReplacePanel } from "@/components/background-replace/Panel";
@@ -130,6 +134,9 @@ function receiptFact(status: string): string {
   return "状态未知";
 }
 
+// 与服务端 sizeadapt.MaxDimension 对齐:单边尺寸上限 16384 px,下限 1 px。
+const MAX_DIMENSION = 16384;
+
 const TECHNICAL_LEAK = /provider|qwen|\bmodel\b|sha256|run_id|\bdebug\b/i;
 
 function publicOrTechnical(raw: string): { show: string; technical: string } {
@@ -143,15 +150,17 @@ function publicOrTechnical(raw: string): { show: string; technical: string } {
   return { show: raw, technical: "" };
 }
 
-function PublicFact({ raw, tone = "warn" }: { raw: string; tone?: "warn" | "plain" }) {
+function PublicFact({ raw, tone }: { raw: string; tone?: "warn" | "plain" }) {
   const fact = publicOrTechnical(raw);
   if (!fact.show) return null;
+  // 成功反馈走 status,失败/警告走 alert;显式 tone 优先。
+  const resolved = tone ?? (/^已|^已生成|^已有变体/.test(fact.show) ? "plain" : "warn");
   return (
     <>
-      {tone === "plain" ? (
-        <span className="muted">{fact.show}</span>
+      {resolved === "plain" ? (
+        <span className="muted" role="status">{fact.show}</span>
       ) : (
-        <div className="banner warn" role="alert">{fact.show}</div>
+        <Alert tone="warn" role="alert">{fact.show}</Alert>
       )}
       {fact.technical ? (
         <details data-technical="true">
@@ -182,6 +191,18 @@ export default function ProjectDetailPage() {
     width_px: 0,
     height_px: 0,
   });
+  // 字段级错误:key 与控件 id 前缀对应;错误节点 id 为 `<id>-error`,
+  // 控件经 aria-describedby 指向该节点,失败字段 aria-invalid 置真。
+  const [fieldErrors, setFieldErrors] = useState<{
+    name?: string;
+    width?: string;
+    height?: string;
+  }>({});
+  const [attachErrors, setAttachErrors] = useState<{
+    assetId?: string;
+    snapshotName?: string;
+    size?: string;
+  }>({});
   const [newInput, setNewInput] = useState({
     platform_asset_id: "",
     snapshot_name: "",
@@ -214,6 +235,7 @@ export default function ProjectDetailPage() {
 
   const loadSource = useCallback(async () => {
     if (!id) return;
+    try {
     // 来源绑定(可空:standalone 完整保留,无来源不影响任何功能)。
     const bres = await fetch(`/api/bindings?project_id=${id}`);
     const bdata = await bres.json().catch(() => null);
@@ -254,11 +276,20 @@ export default function ProjectDetailPage() {
       setSizePresets(null);
       setVariants([]);
     }
+    } catch {
+      setLoadError((cur) => cur || "网络不可用,部分来源信息没取到,请稍后重试。");
+    }
   }, [id]);
 
   const load = useCallback(async () => {
     if (!id) return;
-    const res = await fetch(`/api/projects/${id}`);
+    let res: Response;
+    try {
+      res = await fetch(`/api/projects/${id}`);
+    } catch {
+      setLoadError("网络不可用,暂时拿不到这个工程,请稍后重试。");
+      return;
+    }
     const data = await res.json().catch(() => null);
     if (res.status === 401) {
       router.replace("/login");
@@ -283,7 +314,13 @@ export default function ProjectDetailPage() {
 
   useEffect(() => {
     (async () => {
-      const s = await fetch("/api/auth/session");
+      let s: Response;
+      try {
+        s = await fetch("/api/auth/session");
+      } catch {
+        setLoadError("网络不可用,暂时无法确认登录状态,请稍后重试。");
+        return;
+      }
       if (s.status === 401) {
         router.replace("/login");
         return;
@@ -295,6 +332,17 @@ export default function ProjectDetailPage() {
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
+    const errors: typeof fieldErrors = {};
+    if (!form.name.trim()) errors.name = "请填写工程名称。";
+    if (!Number.isFinite(form.width_px) || form.width_px < 1 || form.width_px > MAX_DIMENSION)
+      errors.width = `宽度须在 1–${MAX_DIMENSION} px 之间。`;
+    if (!Number.isFinite(form.height_px) || form.height_px < 1 || form.height_px > MAX_DIMENSION)
+      errors.height = `高度须在 1–${MAX_DIMENSION} px 之间。`;
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      setNotice("请先修正表单里标出的问题，再保存。");
+      return;
+    }
     setSaving(true);
     setNotice("");
     try {
@@ -308,8 +356,11 @@ export default function ProjectDetailPage() {
         setNotice(data?.error?.message ?? "保存失败");
         return;
       }
+      setFieldErrors({});
       setNotice("已保存");
       await load();
+    } catch {
+      setNotice("网络连接失败，简报未保存，请检查网络后重试。");
     } finally {
       setSaving(false);
     }
@@ -317,18 +368,28 @@ export default function ProjectDetailPage() {
 
   async function addInput(e: React.FormEvent) {
     e.preventDefault();
-    if (!newInput.platform_asset_id.trim()) {
-      setAttachHint("请先填写素材编号，再挂接。");
+    const errs: typeof attachErrors = {};
+    if (!newInput.platform_asset_id.trim()) errs.assetId = "请先填写素材编号，再挂接。";
+    if (newInput.snapshot_size < 0) errs.size = "大小不能为负数。";
+    setAttachErrors(errs);
+    if (Object.keys(errs).length > 0) {
+      setAttachHint(errs.assetId ?? errs.size ?? "");
       setAttachOpen(true);
       return;
     }
     setAttachHint("");
     setNotice("");
-    const res = await fetch(`/api/projects/${id}/inputs`, {
-      method: "POST",
-      headers: jsonHeaders,
-      body: jsonBody(newInput),
-    });
+    let res: Response;
+    try {
+      res = await fetch(`/api/projects/${id}/inputs`, {
+        method: "POST",
+        headers: jsonHeaders,
+        body: jsonBody(newInput),
+      });
+    } catch {
+      setNotice("网络连接失败，素材未挂接，请检查网络后重试。");
+      return;
+    }
     const data = await res.json().catch(() => null);
     if (!res.ok) {
       setNotice(data?.error?.message ?? "挂素材失败");
@@ -344,7 +405,12 @@ export default function ProjectDetailPage() {
   }
 
   async function removeInput(inputId: string) {
-    await fetch(`/api/projects/${id}/inputs/${inputId}`, { method: "DELETE" });
+    try {
+      await fetch(`/api/projects/${id}/inputs/${inputId}`, { method: "DELETE" });
+    } catch {
+      setNotice("网络连接失败，素材未移除，请检查网络后重试。");
+      return;
+    }
     await load();
   }
 
@@ -402,6 +468,8 @@ export default function ProjectDetailPage() {
       if (typeof attachData?.input?.id === "string") setPreferredInputId(attachData.input.id);
       await load();
       setPlateReload((k) => k + 1);
+    } catch {
+      setNotice("网络连接失败，照片未上传，请检查网络后重试。");
     } finally {
       setPhotoBusy(false);
     }
@@ -410,11 +478,17 @@ export default function ProjectDetailPage() {
   // 提交生成(占位链路):开关 off / 服务不可达时展示明确的失败事实。
   async function submitGeneration() {
     setNotice("");
-    const res = await fetch(`/api/projects/${id}/versions`, {
-      method: "POST",
-      headers: jsonHeaders,
-      body: jsonBody({}),
-    });
+    let res: Response;
+    try {
+      res = await fetch(`/api/projects/${id}/versions`, {
+        method: "POST",
+        headers: jsonHeaders,
+        body: jsonBody({}),
+      });
+    } catch {
+      setNotice("网络连接失败，任务未提交，请检查网络后重试。");
+      return;
+    }
     const data = await res.json().catch(() => null);
     if (!res.ok) {
       setNotice(data?.error?.message ?? `提交失败(HTTP ${res.status})`);
@@ -425,7 +499,13 @@ export default function ProjectDetailPage() {
 
   async function loadBalance() {
     setBalance("读取中…");
-    const res = await fetch("/api/billing/balance");
+    let res: Response;
+    try {
+      res = await fetch("/api/billing/balance");
+    } catch {
+      setBalance("不可用:网络连接失败,请稍后重试");
+      return;
+    }
     const data = await res.json().catch(() => null);
     if (!res.ok) {
       setBalance(`不可用:${data?.error?.message ?? `HTTP ${res.status}`}`);
@@ -440,11 +520,17 @@ export default function ProjectDetailPage() {
   async function adoptPending() {
     if (!binding || !pendingSnap) return;
     setSrcNotice("");
-    const res = await fetch(`/api/bindings/${binding.id}/adopt`, {
-      method: "POST",
-      headers: jsonHeaders,
-      body: jsonBody({ snapshot_id: pendingSnap.id }),
-    });
+    let res: Response;
+    try {
+      res = await fetch(`/api/bindings/${binding.id}/adopt`, {
+        method: "POST",
+        headers: jsonHeaders,
+        body: jsonBody({ snapshot_id: pendingSnap.id }),
+      });
+    } catch {
+      setSrcNotice("网络连接失败，新版需求未采用，请检查网络后重试。");
+      return;
+    }
     const data = await res.json().catch(() => null);
     if (!res.ok) {
       setSrcNotice(data?.error?.message ?? `采用失败(HTTP ${res.status})`);
@@ -458,7 +544,13 @@ export default function ProjectDetailPage() {
   async function goBackToSource() {
     if (!binding) return;
     setSrcNotice("");
-    const res = await fetch(`/api/bindings/${binding.id}/return-target`);
+    let res: Response;
+    try {
+      res = await fetch(`/api/bindings/${binding.id}/return-target`);
+    } catch {
+      setSrcNotice("网络连接失败，来源暂不可返回;本工程可继续编辑");
+      return;
+    }
     const data = await res.json().catch(() => null);
     if (!res.ok) {
       setSrcNotice(data?.error?.message ?? "来源暂不可返回;本工程可继续编辑");
@@ -476,15 +568,21 @@ export default function ProjectDetailPage() {
     let bin = "";
     const bytes = new Uint8Array(buf);
     for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-    const res = await fetch(`/api/projects/${id}/outputs`, {
-      method: "POST",
-      headers: jsonHeaders,
-      body: jsonBody({
-        file_name: outputFile.name,
-        content_type: outputFile.type || "image/png",
-        data_b64: btoa(bin),
-      }),
-    });
+    let res: Response;
+    try {
+      res = await fetch(`/api/projects/${id}/outputs`, {
+        method: "POST",
+        headers: jsonHeaders,
+        body: jsonBody({
+          file_name: outputFile.name,
+          content_type: outputFile.type || "image/png",
+          data_b64: btoa(bin),
+        }),
+      });
+    } catch {
+      setSrcNotice("网络连接失败，成果未登记，请检查网络后重试。");
+      return;
+    }
     const data = await res.json().catch(() => null);
     if (!res.ok) {
       setSrcNotice(data?.error?.message ?? `登记失败(HTTP ${res.status})`);
@@ -498,10 +596,16 @@ export default function ProjectDetailPage() {
   // 回传来源:定向回执,只回传既有成果;失败不追加生成任务或扣费。
   async function sendReceipt(outputId: string) {
     setSrcNotice("");
-    const res = await fetch(
-      `/api/projects/${id}/outputs/${outputId}/receipt`,
-      { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }
-    );
+    let res: Response;
+    try {
+      res = await fetch(
+        `/api/projects/${id}/outputs/${outputId}/receipt`,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }
+      );
+    } catch {
+      setSrcNotice("网络连接失败，回执未投递，请检查网络后重试。");
+      return;
+    }
     const data = await res.json().catch(() => null);
     if (!res.ok) {
       setSrcNotice(data?.error?.message ?? `回执失败(HTTP ${res.status})`);
@@ -517,11 +621,17 @@ export default function ProjectDetailPage() {
   // 查询恢复:失败/超时/重复场景只重传既有结果。
   async function resendReceipt(receiptId: string) {
     setSrcNotice("");
-    const res = await fetch(`/api/receipts/${receiptId}/resend`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: "{}",
-    });
+    let res: Response;
+    try {
+      res = await fetch(`/api/receipts/${receiptId}/resend`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+    } catch {
+      setSrcNotice("网络连接失败，回执未重传，请检查网络后重试。");
+      return;
+    }
     const data = await res.json().catch(() => null);
     if (!res.ok) {
       setSrcNotice(data?.error?.message ?? `重传失败(HTTP ${res.status})`);
@@ -579,6 +689,8 @@ export default function ProjectDetailPage() {
       if (dups.length) parts.push(`已有变体(幂等返回):${dups.join("、")}`);
       setSaNotice(parts.join(";"));
       await loadSource();
+    } catch {
+      setSaNotice("网络连接失败，变体未生成，请检查网络后重试。");
     } finally {
       setSaBusy(false);
     }
@@ -607,7 +719,7 @@ export default function ProjectDetailPage() {
     return (
       <section id="recovery" className={`card ${styles.shell}`} aria-label="出错与恢复" data-state="error">
         <h2>这个工程没有打开</h2>
-        <div className="banner" role="alert">{opened.show}</div>
+        <Alert tone="danger" role="alert">{opened.show}</Alert>
         {opened.technical ? (
           <details data-technical="true">
             <summary>技术详情</summary>
@@ -622,7 +734,12 @@ export default function ProjectDetailPage() {
       </section>
     );
   }
-  if (!project) return <div className={`card muted ${styles.shell}`} data-state="loading">加载中…</div>;
+  if (!project) return (
+    <div className={`card ${styles.shell}`} data-state="loading" role="status">
+      <Skeleton className="h-10 w-48" />
+      <div className="muted mt-3">加载中…</div>
+    </div>
+  );
 
   const sourceKind = bindingAgg?.source_context?.source_kind ?? "";
   const sourceApp = bindingAgg?.source_context?.source_app ?? "";
@@ -636,9 +753,9 @@ export default function ProjectDetailPage() {
           来源:
           {project.source_type ? (
             <>
-              <span className="pill">
+              <Badge variant="outline">
                 {projectSourceLabel(project.source_type)} · {project.source_ref}
-              </span>{" "}
+              </Badge>{" "}
               <span className="muted">(来源详情与回传入口见下方卡片)</span>
             </>
           ) : (
@@ -650,7 +767,7 @@ export default function ProjectDetailPage() {
             <dl className={styles.factDl}>
               <div>
                 <dt>状态</dt>
-                <dd><span className="pill">{projectStatusLabel(project.status)}</span></dd>
+                <dd><Badge variant="secondary">{projectStatusLabel(project.status)}</Badge></dd>
               </div>
               <div>
                 <dt>用途</dt>
@@ -662,9 +779,9 @@ export default function ProjectDetailPage() {
               </div>
             </dl>
             <div className="media-actions">
-              <button className="primary" type="submit" disabled={saving}>
+              <Button type="submit" disabled={saving}>
                 {saving ? "保存中…" : "保存简报"}
-              </button>
+              </Button>
             </div>
           </div>
           <details>
@@ -675,9 +792,19 @@ export default function ProjectDetailPage() {
               <input
                 id="proj-name"
                 value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                onChange={(e) => {
+                  setForm({ ...form, name: e.target.value });
+                  setFieldErrors((cur) => ({ ...cur, name: undefined }));
+                }}
                 required
+                aria-invalid={!!fieldErrors.name}
+                aria-describedby={fieldErrors.name ? "proj-name-error" : undefined}
               />
+              {fieldErrors.name ? (
+                <p id="proj-name-error" role="alert" className={styles.fieldError}>
+                  {fieldErrors.name}
+                </p>
+              ) : null}
             </div>
             <div>
               <label htmlFor="proj-status">状态</label>
@@ -708,22 +835,42 @@ export default function ProjectDetailPage() {
               <input
                 id="proj-width"
                 type="number"
+                min={1}
+                max={MAX_DIMENSION}
                 value={form.width_px}
-                onChange={(e) =>
-                  setForm({ ...form, width_px: Number(e.target.value) })
-                }
+                onChange={(e) => {
+                  setForm({ ...form, width_px: Number(e.target.value) });
+                  setFieldErrors((cur) => ({ ...cur, width: undefined }));
+                }}
+                aria-invalid={!!fieldErrors.width}
+                aria-describedby={fieldErrors.width ? "proj-width-error" : undefined}
               />
+              {fieldErrors.width ? (
+                <p id="proj-width-error" role="alert" className={styles.fieldError}>
+                  {fieldErrors.width}
+                </p>
+              ) : null}
             </div>
             <div>
               <label htmlFor="proj-height">高(px)</label>
               <input
                 id="proj-height"
                 type="number"
+                min={1}
+                max={MAX_DIMENSION}
                 value={form.height_px}
-                onChange={(e) =>
-                  setForm({ ...form, height_px: Number(e.target.value) })
-                }
+                onChange={(e) => {
+                  setForm({ ...form, height_px: Number(e.target.value) });
+                  setFieldErrors((cur) => ({ ...cur, height: undefined }));
+                }}
+                aria-invalid={!!fieldErrors.height}
+                aria-describedby={fieldErrors.height ? "proj-height-error" : undefined}
               />
+              {fieldErrors.height ? (
+                <p id="proj-height-error" role="alert" className={styles.fieldError}>
+                  {fieldErrors.height}
+                </p>
+              ) : null}
             </div>
           </div>
           </details>
@@ -743,7 +890,7 @@ export default function ProjectDetailPage() {
                 <div>{i.snapshot_name || "未命名素材"}</div>
                 <a href={`/api/projects/${id}/inputs/${i.id}/content`} target="_blank" rel="noreferrer">查看</a>
                 {" "}
-                <button type="button" onClick={() => removeInput(i.id)}>移除</button>
+                <Button type="button" size="sm" variant="outline" onClick={() => removeInput(i.id)}>移除</Button>
               </li>
             ))}
           </ul>
@@ -786,10 +933,10 @@ export default function ProjectDetailPage() {
         </details>
         <form onSubmit={uploadPhoto} className="mt-12">
           <div className="media-actions">
-            <button className="primary" type="submit" disabled={!photoFile || photoBusy}>
+            <Button type="submit" disabled={!photoFile || photoBusy}>
               {photoBusy ? "上传中…" : "上传并挂接"}
-            </button>
-            <button type="submit" form="proj-attach-form">挂接素材</button>
+            </Button>
+            <Button type="submit" size="sm" variant="outline" form="proj-attach-form">挂接素材</Button>
             {attachHint ? <p className={styles.attachHint} role="status">{attachHint}</p> : null}
           </div>
           <div className="row">
@@ -813,17 +960,27 @@ export default function ProjectDetailPage() {
         <form id="proj-attach-form" onSubmit={addInput} className="mt-12">
           <div className="row">
             <div>
-              <label>平台 asset_id</label>
+              <label htmlFor="proj-attach-asset-id">平台 asset_id</label>
               <input
+                id="proj-attach-asset-id"
                 value={newInput.platform_asset_id}
-                onChange={(e) =>
-                  setNewInput({ ...newInput, platform_asset_id: e.target.value })
-                }
+                onChange={(e) => {
+                  setNewInput({ ...newInput, platform_asset_id: e.target.value });
+                  setAttachErrors((cur) => ({ ...cur, assetId: undefined }));
+                }}
+                aria-invalid={!!attachErrors.assetId}
+                aria-describedby={attachErrors.assetId ? "proj-attach-asset-id-error" : undefined}
               />
+              {attachErrors.assetId ? (
+                <p id="proj-attach-asset-id-error" role="alert" className={styles.fieldError}>
+                  {attachErrors.assetId}
+                </p>
+              ) : null}
             </div>
             <div>
-              <label>快照文件名</label>
+              <label htmlFor="proj-attach-snapshot-name">快照文件名</label>
               <input
+                id="proj-attach-snapshot-name"
                 value={newInput.snapshot_name}
                 onChange={(e) =>
                   setNewInput({ ...newInput, snapshot_name: e.target.value })
@@ -831,14 +988,24 @@ export default function ProjectDetailPage() {
               />
             </div>
             <div>
-              <label>大小(字节)</label>
+              <label htmlFor="proj-attach-size">大小(字节)</label>
               <input
+                id="proj-attach-size"
                 type="number"
+                min={0}
                 value={newInput.snapshot_size}
-                onChange={(e) =>
-                  setNewInput({ ...newInput, snapshot_size: Number(e.target.value) })
-                }
+                onChange={(e) => {
+                  setNewInput({ ...newInput, snapshot_size: Number(e.target.value) });
+                  setAttachErrors((cur) => ({ ...cur, size: undefined }));
+                }}
+                aria-invalid={!!attachErrors.size}
+                aria-describedby={attachErrors.size ? "proj-attach-size-error" : undefined}
               />
+              {attachErrors.size ? (
+                <p id="proj-attach-size-error" role="alert" className={styles.fieldError}>
+                  {attachErrors.size}
+                </p>
+              ) : null}
             </div>
           </div>
         </form>
@@ -862,9 +1029,9 @@ export default function ProjectDetailPage() {
       }
       status={
         <>
-          <span className="pill">{projectStatusLabel(project.status)}</span>
-          <span className="pill">{project.usage_kind || "用途未填写"}</span>
-          <span className="pill">{project.width_px}×{project.height_px}</span>
+          <Badge variant="secondary">{projectStatusLabel(project.status)}</Badge>
+          <Badge variant="outline">{project.usage_kind || "用途未填写"}</Badge>
+          <Badge variant="outline">{project.width_px}×{project.height_px}</Badge>
         </>
       }
       backHref="/projects"
@@ -924,8 +1091,8 @@ export default function ProjectDetailPage() {
       <div className="card">
         <h2>任务与费用事实</h2>
         <div className="media-actions">
-          <button className="primary" onClick={submitGeneration}>提交生成</button>
-          <button onClick={loadBalance}>读取费用事实</button>
+          <Button onClick={submitGeneration}>提交生成</Button>
+          <Button variant="outline" onClick={loadBalance}>读取费用事实</Button>
         </div>
         {balance ? <PublicFact raw={balance} tone="plain" /> : null}
         {versions.length === 0 ? (
@@ -935,7 +1102,7 @@ export default function ProjectDetailPage() {
             {versions.map((v) => (
               <li key={v.id} className={styles.factCard}>
                 <strong>v{v.version_no}</strong>
-                <span className="pill">{versionFact(v.status)}</span>
+                <Badge variant="secondary">{versionFact(v.status)}</Badge>
                 <span className="muted">{v.created_at || "时间未知"}</span>
               </li>
             ))}
@@ -975,7 +1142,7 @@ export default function ProjectDetailPage() {
         <div className="card">
           <h2>来源信息(跨应用续接)</h2>
           <div className="media-actions">
-            <button onClick={goBackToSource}>返回来源</button>
+            <Button variant="outline" onClick={goBackToSource}>返回来源</Button>
             {returnURL ? (
               <a className="link" href={returnURL} target="_blank" rel="noreferrer">
                 打开来源应用 ↗
@@ -985,7 +1152,7 @@ export default function ProjectDetailPage() {
           <dl className={styles.factDl}>
             <div>
               <dt>来源</dt>
-              <dd><span className="pill">{projectSourceLabel(sourceKind) || "来源未知"}</span></dd>
+              <dd><Badge variant="outline">{projectSourceLabel(sourceKind) || "来源未知"}</Badge></dd>
             </div>
             <div>
               <dt>订单</dt>
@@ -1020,15 +1187,15 @@ export default function ProjectDetailPage() {
           </dl>
           <p className="muted">来源文本仅作数据展示;续接编辑在本工程进行。</p>
           {pendingSnap ? (
-            <div className="banner warn mt-8">
+            <Alert tone="warn" className="mt-8">
               来源需求已有新版({pendingSnap.brief_version})待确认。
-              <button onClick={adoptPending} className="banner-action">
+              <Button size="sm" onClick={adoptPending}>
                 确认并采用新版
-              </button>
+              </Button>
               <span className="muted">
                 (采用只切换需求版本;人工编辑与已选输出不会被覆盖)
               </span>
-            </div>
+            </Alert>
           ) : null}
           <details data-technical="true">
             <summary>来源技术详情</summary>
@@ -1085,9 +1252,9 @@ export default function ProjectDetailPage() {
         </p>
         <form onSubmit={registerOutput}>
           <div className="media-actions">
-            <button className="primary" type="submit" disabled={!outputFile}>
+            <Button type="submit" disabled={!outputFile}>
               登记成果
-            </button>
+            </Button>
           </div>
           <div>
             <label htmlFor="output-file">选择成果文件(仅 PNG)</label>
@@ -1114,16 +1281,16 @@ export default function ProjectDetailPage() {
                   {binding ? (
                     rcpt ? (
                       <span>
-                        <span className="pill">
+                        <Badge variant="secondary">
                           {receiptFact(rcpt.status)}
                           {rcpt.attempts > 1 ? ` ×${rcpt.attempts}` : ""}
-                        </span>{" "}
+                        </Badge>{" "}
                         {rcpt.status !== "delivered" ? (
-                          <button onClick={() => resendReceipt(rcpt.id)}>重传</button>
+                          <Button size="sm" variant="outline" onClick={() => resendReceipt(rcpt.id)}>重传</Button>
                         ) : null}
                       </span>
                     ) : (
-                      <button onClick={() => sendReceipt(o.id)}>回传来源</button>
+                      <Button size="sm" variant="outline" onClick={() => sendReceipt(o.id)}>回传来源</Button>
                     )
                   ) : (
                     <span className="muted">无来源,不回传</span>
@@ -1178,13 +1345,12 @@ export default function ProjectDetailPage() {
         <div className="card">
           <h2>尺寸适配(电商规格)</h2>
           <div className="media-actions">
-            <button
-              className="primary"
+            <Button
               onClick={generateVariants}
               disabled={saBusy || !saFile || !saSource || saSelected.length === 0}
             >
               {saBusy ? "生成中…" : `生成 ${saSelected.length} 个变体`}
-            </button>
+            </Button>
           </div>
           <p className="muted mt-4">
             纯确定性变换(等比缩放 + 白底填充 / 居中裁切),不调用 AI、不产生任务与费用。
@@ -1254,7 +1420,7 @@ export default function ProjectDetailPage() {
               {variants.map((v) => (
                 <li key={v.id} className={styles.factCard}>
                   <strong>{v.file_name || "未命名变体"}</strong>
-                  <span className="pill">{v.preset_name}</span>
+                  <Badge variant="outline">{v.preset_name}</Badge>
                   <span>{v.variant_width}×{v.variant_height}</span>
                   <span>{v.variant_mode === "cover" ? "裁切" : "白底"}</span>
                   <span>大小 {v.result_size}</span>

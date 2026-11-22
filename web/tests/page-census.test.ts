@@ -221,8 +221,8 @@ describe("半成品标记", () => {
       ["/start", []],
       ["/projects", ["raw input", "raw table"]],
       ["/projects/[id]", ["raw button", "raw input", "raw table"]],
-      ["/batches", ["inline style", "raw button", "raw input", "raw table"]],
-      ["/handoff", ["inline style", "raw button", "raw input", "raw table"]],
+      ["/batches", ["inline style", "raw input", "raw table"]],
+      ["/handoff", ["inline style", "raw table"]],
     ]);
     const census = pageCensus();
     expect(census).toHaveLength(want.size);

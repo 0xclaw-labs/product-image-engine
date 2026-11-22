@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ErrorBanner } from "@/components/ui/error-banner";
+import { Badge } from "@/components/ui/badge";
+import { Alert } from "@/components/ui/alert";
+import { Skeleton } from "@/components/shadcn/skeleton";
 import { jsonBody, jsonHeaders } from "@/lib/api-client";
 import { projectSourceLabel, projectStatusLabel } from "@/lib/project-labels";
 import { Input } from "@/components/ui/input";
@@ -37,6 +39,23 @@ export default function ProjectsPage() {
   });
   const [creating, setCreating] = useState(false);
 
+  const reload = useCallback(async () => {
+    let res: Response;
+    try {
+      res = await fetch("/api/projects");
+    } catch {
+      setError("网络不可用,暂时拿不到工程列表,请稍后重试。");
+      return;
+    }
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      setError(data?.error?.message ?? "加载失败");
+      return;
+    }
+    setError("");
+    setProjects((data?.projects ?? []) as Project[]);
+  }, []);
+
   useEffect(() => {
     (async () => {
       let session: Response;
@@ -55,23 +74,6 @@ export default function ProjectsPage() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  async function reload() {
-    let res: Response;
-    try {
-      res = await fetch("/api/projects");
-    } catch {
-      setError("网络不可用,暂时拿不到工程列表,请稍后重试。");
-      return;
-    }
-    const data = await res.json().catch(() => null);
-    if (!res.ok) {
-      setError(data?.error?.message ?? "加载失败");
-      return;
-    }
-    setError("");
-    setProjects((data?.projects ?? []) as Project[]);
-  }
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
@@ -92,6 +94,8 @@ export default function ProjectsPage() {
       await reload();
       const id = data?.project?.id;
       if (id) router.push(`/projects/${id}`);
+    } catch {
+      setError("网络连接失败，工程未创建，请检查网络后重试。");
     } finally {
       setCreating(false);
     }
@@ -120,16 +124,18 @@ export default function ProjectsPage() {
             </div>
             <div className="row">
               <div>
-                <label>工程名称</label>
+                <label htmlFor="proj-create-name">工程名称</label>
                 <Input
+                  id="proj-create-name"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   required
                 />
               </div>
               <div>
-                <label>用途</label>
+                <label htmlFor="proj-create-usage">用途</label>
                 <Input
+                  id="proj-create-usage"
                   value={form.usage_kind}
                   onChange={(e) =>
                     setForm({ ...form, usage_kind: e.target.value })
@@ -139,9 +145,12 @@ export default function ProjectsPage() {
             </div>
             <div className="row">
               <div>
-                <label>宽(px)</label>
+                <label htmlFor="proj-create-width">宽(px)</label>
                 <input
+                  id="proj-create-width"
                   type="number"
+                  min={1}
+                  max={16384}
                   value={form.width_px}
                   onChange={(e) =>
                     setForm({ ...form, width_px: Number(e.target.value) })
@@ -149,9 +158,12 @@ export default function ProjectsPage() {
                 />
               </div>
               <div>
-                <label>高(px)</label>
+                <label htmlFor="proj-create-height">高(px)</label>
                 <input
+                  id="proj-create-height"
                   type="number"
+                  min={1}
+                  max={16384}
                   value={form.height_px}
                   onChange={(e) =>
                     setForm({ ...form, height_px: Number(e.target.value) })
@@ -159,8 +171,9 @@ export default function ProjectsPage() {
                 />
               </div>
               <div>
-                <label>来源类型</label>
+                <label htmlFor="proj-create-source">来源类型</label>
                 <select
+                  id="proj-create-source"
                   value={form.source_type}
                   onChange={(e) =>
                     setForm({ ...form, source_type: e.target.value })
@@ -173,8 +186,9 @@ export default function ProjectsPage() {
               </div>
               {form.source_type !== "standalone" ? (
                 <div>
-                  <label>来源引用(source_ref)</label>
+                  <label htmlFor="proj-create-ref">来源引用(source_ref)</label>
                   <input
+                    id="proj-create-ref"
                     value={form.source_ref}
                     onChange={(e) =>
                       setForm({ ...form, source_ref: e.target.value })
@@ -187,17 +201,29 @@ export default function ProjectsPage() {
           </form>
         ) : null}
         {error ? (
-          <div data-state="error">
-            <ErrorBanner message={error} onRetry={() => void reload()} />
+          <div data-state="error" className="mt-3">
+            <Alert tone="danger" role="alert">
+              <div className="flex flex-wrap items-center gap-3">
+                {error}
+                <Button type="button" size="sm" variant="outline" onClick={() => void reload()}>
+                  重试
+                </Button>
+              </div>
+            </Alert>
           </div>
         ) : null}
       </div>
 
       <div className="card" data-region="collection">
         {projects === null ? (
-          <span className="muted" data-state="loading">加载中…</span>
+          <div data-state="loading" role="status" className="grid gap-3">
+            <Skeleton className="h-16 w-full" />
+            <Skeleton className="h-16 w-full" />
+          </div>
         ) : projects.length === 0 ? (
-          <span className="muted" data-state="empty">还没有工程。<Link className="link" href="/start">去开始做产品图</Link></span>
+          <span className="muted" data-state="empty">
+            还没有工程。<Link className="link" href="/start">去开始做产品图</Link>
+          </span>
         ) : (
           <>
             <ul className="asset-strip" aria-label="工程">
@@ -206,15 +232,15 @@ export default function ProjectsPage() {
                   <Link className="link" href={`/projects/${p.id}`}>
                     {p.name}
                   </Link>
-                  <div><span className="pill">{projectStatusLabel(p.status)}</span></div>
+                  <div><Badge variant="secondary">{projectStatusLabel(p.status)}</Badge></div>
                   <div>{p.usage_kind || "—"}</div>
                   <div>{p.width_px}×{p.height_px}</div>
                   <div>
                     {p.source_type ? (
-                      <span className="pill">
+                      <Badge variant="outline">
                         {projectSourceLabel(p.source_type)}
                         {p.source_ref ? ` · ${p.source_ref}` : ""}
-                      </span>
+                      </Badge>
                     ) : (
                       "—"
                     )}
