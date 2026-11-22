@@ -147,11 +147,16 @@ export default function StartClient() {
   }
 
   async function requestQuote(id: string) {
-    const res = await fetch("/api/billing/consume/quote", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(quotePayload(id)),
-    });
+    let res: Response;
+    try {
+      res = await fetch("/api/billing/consume/quote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(quotePayload(id)),
+      });
+    } catch {
+      return { status: 0, body: null };
+    }
     const body = (await res.json().catch(() => null)) as QuoteBody | null;
     return { status: res.status, body };
   }
@@ -159,7 +164,16 @@ export default function StartClient() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const session = await fetch("/api/auth/session");
+      let session: Response;
+      try {
+        session = await fetch("/api/auth/session");
+      } catch {
+        if (!cancelled) {
+          setNotice("网络不可用,暂时无法确认登录状态,请稍后重试。");
+          setReady(true);
+        }
+        return;
+      }
       if (session.status === 401) {
         router.replace("/login");
         return;
@@ -174,21 +188,30 @@ export default function StartClient() {
         return;
       }
       if (sourced && sourceRef && sourceTenant && returnHref) {
-        const res = await fetch("/api/entry/source", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            source_type: source,
-            source_ref: sourceRef,
-            source_tenant_id: sourceTenant,
-            return_href: returnHref,
-            authorized_assets: asset ? [{ asset_ref: asset, owner_tenant: sourceTenant }] : [],
-            usage_kind: "电商主图",
-            width_px: 800,
-            height_px: 800,
-            background_direction: "场景",
-          }),
-        });
+        let res: Response;
+        try {
+          res = await fetch("/api/entry/source", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              source_type: source,
+              source_ref: sourceRef,
+              source_tenant_id: sourceTenant,
+              return_href: returnHref,
+              authorized_assets: asset ? [{ asset_ref: asset, owner_tenant: sourceTenant }] : [],
+              usage_kind: "电商主图",
+              width_px: 800,
+              height_px: 800,
+              background_direction: "场景",
+            }),
+          });
+        } catch {
+          if (!cancelled) {
+            setNotice("网络连接失败，来源入口未打开，请检查网络后重试。");
+            setReady(true);
+          }
+          return;
+        }
         const data = (await res.json().catch(() => null)) as StartResponse | null;
         if (!cancelled) {
           if (!res.ok) {
@@ -200,16 +223,29 @@ export default function StartClient() {
         }
         return;
       }
-      const listed = await fetch("/api/entry/personal");
+      let listed: Response;
+      try {
+        listed = await fetch("/api/entry/personal");
+      } catch {
+        if (!cancelled) {
+          setNotice("网络连接失败，最近任务没取到，请检查网络后重试。");
+          setReady(true);
+        }
+        return;
+      }
       const list = (await listed.json().catch(() => null)) as { sessions?: SessionBody[] } | null;
       const current = list?.sessions?.[0];
       if (!cancelled && current?.project_id && !projectParam) {
         setProjectId(current.project_id);
         setScope(PERSONAL_SCOPE);
-        const task = await fetch(`/api/projects/${current.project_id}/first-image`);
-        if (task.ok) {
-          const body = (await task.json()) as { session?: SessionBody };
-          applySession(body.session);
+        try {
+          const task = await fetch(`/api/projects/${current.project_id}/first-image`);
+          if (task.ok) {
+            const body = (await task.json()) as { session?: SessionBody };
+            applySession(body.session);
+          }
+        } catch {
+          // 最近任务状态取不到不阻塞新创作;探针继续放行到工作台。
         }
       }
       if (!cancelled) setReady(true);
@@ -261,6 +297,8 @@ export default function StartClient() {
         return;
       }
       applySession(data?.session);
+    } catch {
+      setNotice("网络连接失败，生成没有开始，请检查网络后重试。");
     } finally {
       setBusy(false);
     }
@@ -300,6 +338,8 @@ export default function StartClient() {
         return;
       }
       applySession(data?.session);
+    } catch {
+      setNotice("网络连接失败，任务状态没刷新，请检查网络后重试。");
     } finally {
       setBusy(false);
     }
@@ -315,7 +355,7 @@ export default function StartClient() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ project_id: projectId, page: "success" }),
-      });
+      }).catch(() => undefined);
       if (!cancelled) setQuotedGenerate(false);
     })();
     return () => {

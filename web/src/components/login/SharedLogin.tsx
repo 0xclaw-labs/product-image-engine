@@ -58,10 +58,12 @@ export function SharedLogin({
           name: "产品图",
           media: null,
           accent: {
-            base: "var(--accent)",
-            hover: "var(--accent-hover)",
-            weak: "var(--accent-weak)",
-            onAccent: "var(--on-accent)",
+            // 实心品牌走 --primary；弱底走 --secondary（= --pn-brand-weak）；
+            // 不再消费 --accent（本仓 --accent 语义为弱强调底，见 globals.css）。
+            base: "var(--primary)",
+            hover: "var(--brand-hover)",
+            weak: "var(--secondary)",
+            onAccent: "var(--primary-foreground)",
           },
         }}
         auth={{ signIn }}
