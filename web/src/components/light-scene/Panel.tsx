@@ -185,8 +185,8 @@ export function LightScenePanel({ projectId, inputs }: { projectId: string; inpu
       </p>
       <div className="row">
         <div>
-          <label>商品输入</label>
-          <select value={inputId} onChange={(e) => setInputId(e.target.value)}>
+          <label htmlFor="ls-input">商品输入</label>
+          <select id="ls-input" value={inputId} onChange={(e) => setInputId(e.target.value)}>
             {inputs.length === 0 ? <option value="">先挂接商品照片</option> : null}
             {inputs.map((item) => (
               <option key={item.id} value={item.id}>

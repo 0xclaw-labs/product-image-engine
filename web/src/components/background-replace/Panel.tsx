@@ -321,8 +321,8 @@ export function BackgroundReplacePanel({
       </div>
       <div className="row">
         <div>
-          <label>商品输入</label>
-          <select value={inputId} onChange={(e) => setInputId(e.target.value)}>
+          <label htmlFor="bg-input">商品输入</label>
+          <select id="bg-input" value={inputId} onChange={(e) => setInputId(e.target.value)}>
             {inputs.length === 0 ? <option value="">先上传或挂接商品照片</option> : null}
             {inputs.map((item) => (
               <option key={item.id} value={item.id}>
@@ -450,8 +450,9 @@ export function BackgroundReplacePanel({
           <div className="row" data-testid="bg-inspect">
             {(Object.keys(axisLabel) as AxisKey[]).map((key) => (
               <div key={key}>
-                <label>{axisLabel[key]}</label>
+                <label htmlFor={`bg-axis-${key}`}>{axisLabel[key]}</label>
                 <select
+                  id={`bg-axis-${key}`}
                   value={axes[key]}
                   onChange={(e) => setAxes({ ...axes, [key]: e.target.value })}
                 >
