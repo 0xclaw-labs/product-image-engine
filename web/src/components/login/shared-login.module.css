@@ -3,7 +3,10 @@
    版式是包契约（「禁改版式」），所以这里只给色值、不给布局规则。
    色值全部对齐 globals.css 的本仓设计系统 token；品牌色不在这里覆写——
    由 SharedLogin 经 brand.accent 注入（--primary/--brand-hover/--secondary/--primary-foreground），
-   组件卡之外的收尾文案复用页面全局工具类（muted/mt-12/mb-0）。 */
+   组件卡之外的收尾文案复用页面全局工具类（muted/mt-12/mb-0）。
+   注意：fg 角色（--lpg-fg-muted / --lpg-fg-faint）必须映射到文字令牌
+   --muted-foreground（--pn-text-muted）；错挂 --muted（= --pn-bg-sunken
+   底色令牌）会让标签/副标/脚注变成深色压深色卡。 */
 .light {
   color-scheme: light;
   --lpg-bg-base: var(--bg);
@@ -12,8 +15,8 @@
   --lpg-bg-sunken: var(--bg);
   --lpg-line: var(--border);
   --lpg-fg: var(--text);
-  --lpg-fg-muted: var(--muted);
-  --lpg-fg-faint: var(--muted);
+  --lpg-fg-muted: var(--muted-foreground);
+  --lpg-fg-faint: var(--muted-foreground);
   --lpg-danger: var(--danger);
   --lpg-danger-weak: var(--danger-bg);
 }
