@@ -301,7 +301,7 @@ export default function HandoffPage() {
             <table>
               <tbody>
                 <tr>
-                  <th>来源</th>
+                  <th scope="row">来源</th>
                   <td>
                     {ctx?.source_kind} · {ctx?.source_app}
                     {ctx?.order_ref ? ` · 订单 ${ctx.order_ref}` : ""}
@@ -310,25 +310,25 @@ export default function HandoffPage() {
                   </td>
                 </tr>
                 <tr>
-                  <th>付款主体</th>
+                  <th scope="row">付款主体</th>
                   <td>{ctx?.principal_id || "未知"}</td>
                 </tr>
                 <tr>
-                  <th>需求版本</th>
+                  <th scope="row">需求版本</th>
                   <td>{result.snapshot?.brief_version}</td>
                 </tr>
                 <tr>
-                  <th>用途 / 交付</th>
+                  <th scope="row">用途 / 交付</th>
                   <td>
                     {result.project?.usage_kind} · {ctx?.delivery_spec?.media_type}
                   </td>
                 </tr>
                 <tr>
-                  <th>素材</th>
+                  <th scope="row">素材</th>
                   <td>{uniqueAssets.length}</td>
                 </tr>
                 <tr>
-                  <th>授权范围</th>
+                  <th scope="row">授权范围</th>
                   <td>{(ctx?.scopes ?? []).join(" / ")}</td>
                 </tr>
               </tbody>
@@ -367,9 +367,9 @@ export default function HandoffPage() {
                 <table>
                   <thead>
                     <tr>
-                      <th>项</th>
-                      <th>当前已采用</th>
-                      <th>新版(待确认)</th>
+                      <th scope="col">项</th>
+                      <th scope="col">当前已采用</th>
+                      <th scope="col">新版(待确认)</th>
                     </tr>
                   </thead>
                   <tbody>

@@ -901,11 +901,11 @@ export default function ProjectDetailPage() {
           <table>
             <thead>
               <tr>
-                <th>asset_id</th>
-                <th>快照名</th>
-                <th>大小</th>
-                <th>类型</th>
-                <th></th>
+                <th scope="col">asset_id</th>
+                <th scope="col">快照名</th>
+                <th scope="col">大小</th>
+                <th scope="col">类型</th>
+                <th scope="col"></th>
               </tr>
             </thead>
             <tbody>
@@ -913,7 +913,7 @@ export default function ProjectDetailPage() {
                 <tr key={i.id}>
                   <td>{i.platform_asset_id}</td>
                   <td>{i.snapshot_name || "—"}</td>
-                  <td>{i.snapshot_size}</td>
+                  <td className="tabular-nums">{i.snapshot_size}</td>
                   <td>{i.snapshot_content_type || "—"}</td>
                   <td>
                     <a
@@ -1119,9 +1119,9 @@ export default function ProjectDetailPage() {
             <table>
               <thead>
                 <tr>
-                  <th>版本</th>
-                  <th>状态</th>
-                  <th>创建时间</th>
+                  <th scope="col">版本</th>
+                  <th scope="col">状态</th>
+                  <th scope="col">创建时间</th>
                 </tr>
               </thead>
               <tbody>
@@ -1202,19 +1202,19 @@ export default function ProjectDetailPage() {
             <table>
               <tbody>
                 <tr>
-                  <th>来源</th>
+                  <th scope="row">来源</th>
                   <td>{sourceKind || "—"} · {sourceApp || "—"}</td>
                 </tr>
                 <tr>
-                  <th>付款主体</th>
+                  <th scope="row">付款主体</th>
                   <td>{principalId || "—"}</td>
                 </tr>
                 <tr>
-                  <th>交接</th>
+                  <th scope="row">交接</th>
                   <td>{pendingSnap?.handoff_id || "—"}</td>
                 </tr>
                 <tr>
-                  <th>素材引用</th>
+                  <th scope="row">素材引用</th>
                   <td>
                     {(bindingAgg.source_context?.assets ?? []).length === 0
                       ? "—"
@@ -1224,7 +1224,7 @@ export default function ProjectDetailPage() {
                   </td>
                 </tr>
                 <tr>
-                  <th>授权范围</th>
+                  <th scope="row">授权范围</th>
                   <td>{(bindingAgg.source_context?.scopes ?? []).join(" / ") || "—"}</td>
                 </tr>
               </tbody>
@@ -1308,13 +1308,13 @@ export default function ProjectDetailPage() {
             <table>
               <thead>
                 <tr>
-                  <th>文件</th>
-                  <th>资产引用</th>
-                  <th>需求版本</th>
-                  <th>大小</th>
-                  <th>登记时间</th>
-                  <th>回执</th>
-                  <th>失败原因</th>
+                  <th scope="col">文件</th>
+                  <th scope="col">资产引用</th>
+                  <th scope="col">需求版本</th>
+                  <th scope="col">大小</th>
+                  <th scope="col">登记时间</th>
+                  <th scope="col">回执</th>
+                  <th scope="col">失败原因</th>
                 </tr>
               </thead>
               <tbody>
@@ -1325,7 +1325,7 @@ export default function ProjectDetailPage() {
                       <td>{o.file_name || "—"}</td>
                       <td>{o.platform_asset_id || "—"}</td>
                       <td>{o.brief_version || "—"}</td>
-                      <td>{o.result_size}</td>
+                      <td className="tabular-nums">{o.result_size}</td>
                       <td className="muted">{o.created_at || "时间未知"}</td>
                       <td>{rcpt ? `${rcpt.status || "状态未知"} ×${rcpt.attempts}` : "无回执"}</td>
                       <td>{rcpt?.last_error || "—"}</td>
@@ -1439,13 +1439,13 @@ export default function ProjectDetailPage() {
               <table>
                 <thead>
                   <tr>
-                    <th>缩略名</th>
-                    <th>预设</th>
-                    <th>尺寸</th>
-                    <th>模式</th>
-                    <th>大小</th>
-                    <th>时间</th>
-                    <th></th>
+                    <th scope="col">缩略名</th>
+                    <th scope="col">预设</th>
+                    <th scope="col">尺寸</th>
+                    <th scope="col">模式</th>
+                    <th scope="col">大小</th>
+                    <th scope="col">时间</th>
+                    <th scope="col"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1455,7 +1455,7 @@ export default function ProjectDetailPage() {
                       <td><span className="pill">{v.preset_name}</span></td>
                       <td>{v.variant_width}×{v.variant_height}</td>
                       <td>{v.variant_mode === "cover" ? "裁切" : "白底"}</td>
-                      <td>{v.result_size}</td>
+                      <td className="tabular-nums">{v.result_size}</td>
                       <td className="muted">{v.created_at || "时间未知"}</td>
                       <td>
                         <a className="link" href={`/api/projects/${id}/size-adapt/${v.id}/download`}>下载</a>

@@ -497,10 +497,10 @@ export function BackgroundReplacePanel({
           <table style={{ marginTop: 16 }}>
           <thead>
             <tr>
-              <th>样本</th>
-              <th>质量</th>
-              <th>模型用量</th>
-              <th>费用</th>
+              <th scope="col">样本</th>
+              <th scope="col">质量</th>
+              <th scope="col">模型用量</th>
+              <th scope="col">费用</th>
             </tr>
           </thead>
           <tbody>
@@ -508,8 +508,8 @@ export function BackgroundReplacePanel({
               <tr key={sample.kind}>
                 <td>{sample.label}</td>
                 <td>{sample.quality}</td>
-                <td>{sample.model_usage}</td>
-                <td>{sample.cost_label}</td>
+                <td className="tabular-nums">{sample.model_usage}</td>
+                <td className="tabular-nums">{sample.cost_label}</td>
               </tr>
             ))}
           </tbody>

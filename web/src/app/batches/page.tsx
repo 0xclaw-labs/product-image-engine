@@ -442,12 +442,12 @@ export default function BatchesPage() {
               <table>
                 <thead>
                   <tr>
-                    <th>名称</th>
-                    <th>状态</th>
-                    <th>进度(成功/总数)</th>
-                    <th>失败</th>
-                    <th>受阻</th>
-                    <th>更新时间</th>
+                    <th scope="col">名称</th>
+                    <th scope="col">状态</th>
+                    <th scope="col">进度(成功/总数)</th>
+                    <th scope="col">失败</th>
+                    <th scope="col">受阻</th>
+                    <th scope="col">更新时间</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -458,11 +458,11 @@ export default function BatchesPage() {
                         {b.status || "状态未知"}
                         {b.error_code ? ` (${b.error_code})` : ""}
                       </td>
-                      <td>
+                      <td className="tabular-nums">
                         {b.counts?.succeeded ?? 0}/{b.counts?.total ?? 0}
                       </td>
-                      <td>{b.counts?.failed ?? 0}</td>
-                      <td>{b.counts?.blocked ?? 0}</td>
+                      <td className="tabular-nums">{b.counts?.failed ?? 0}</td>
+                      <td className="tabular-nums">{b.counts?.blocked ?? 0}</td>
                       <td className="muted">{b.updated_at}</td>
                     </tr>
                   ))}
@@ -533,12 +533,12 @@ export default function BatchesPage() {
                 <table>
                   <thead>
                     <tr>
-                      <th>文件</th>
-                      <th>状态</th>
-                      <th>错误码</th>
-                      <th>尝试</th>
-                      <th>成果</th>
-                      <th>变体</th>
+                      <th scope="col">文件</th>
+                      <th scope="col">状态</th>
+                      <th scope="col">错误码</th>
+                      <th scope="col">尝试</th>
+                      <th scope="col">成果</th>
+                      <th scope="col">变体</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -547,7 +547,7 @@ export default function BatchesPage() {
                         <td>{it.input_name}</td>
                         <td>{it.status || "状态未知"}</td>
                         <td className="muted">{it.error_code || "—"}</td>
-                        <td>{it.attempts}</td>
+                        <td className="tabular-nums">{it.attempts}</td>
                         <td>{it.output_id ? "已登记" : "—"}</td>
                         <td className="muted">
                           {(it.size_variant_ids?.length ?? 0) > 0
