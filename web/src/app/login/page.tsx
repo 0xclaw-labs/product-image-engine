@@ -7,7 +7,7 @@ import { fetchWithRefresh } from "@/lib/api-client";
 import { firstScreen, loggedInHome } from "@/lib/first-image";
 import { SharedLogin, createBffSignIn } from "@/components/login/SharedLogin";
 import { Alert, AlertDescription } from "@/components/shadcn/alert";
-import { Button } from "@/components/shadcn/button";
+import { Button } from "@/components/ui/button";
 
 // 登录页:左台保留产品声音(五步真实流程+诚实声明),表单本体是生态统一组件
 // @painuo/login-page(vendor/login-page)。组件卡自带品牌头(h1「产品图」+封闭

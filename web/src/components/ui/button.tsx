@@ -3,14 +3,12 @@ import {
   type ButtonProps,
 } from "@/components/shadcn/button";
 
-type Variant = "default" | "outline" | "secondary";
-type Size = "default" | "sm";
-
-// 兼容旧引用:底层实现已迁移到 shadcn/ui 原语,variant/size 接口保持不变。
+// 兼容旧引用:底层实现为 shadcn/ui 原语;variant/size 透传 Radix 全量变体,
+// 调用面保持与 shadcn ButtonProps 一致。
 export function Button({
   variant = "default",
   size = "default",
   ...props
-}: ButtonProps & { variant?: Variant; size?: Size }) {
+}: ButtonProps) {
   return <ShadcnButton variant={variant} size={size} {...props} />;
 }

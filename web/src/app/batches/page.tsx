@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Alert } from "@/components/ui/alert";
-import { Skeleton } from "@/components/shadcn/skeleton";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/shadcn/progress";
 
 interface BatchCounts {

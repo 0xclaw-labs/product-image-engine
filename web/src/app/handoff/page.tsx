@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/shadcn/alert";
 import { Textarea } from "@/components/shadcn/textarea";
-import { Skeleton } from "@/components/shadcn/skeleton";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface SourceContext {
   source_kind?: string;
