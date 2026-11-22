@@ -52,7 +52,10 @@ jobs:
           printf '%s\n' '[ssh.github.com]:443 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' > "$auth_dir/known_hosts"
           export GIT_SSH_COMMAND="ssh -F /dev/null -i '$auth_dir/key' -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile='$auth_dir/known_hosts' -p 443"
           export GIT_CONFIG_COUNT=1
-          export GIT_CONFIG_KEY_0=url.ssh://git@ssh.github.com:443/bianjiefilm/public-ai.insteadOf
+          # 2026-11-22：仓已迁 org（bianjiefilm→0xclaw-labs，redirect 型）。deploy key 不随
+          # redirect 生效——重写目标改指新仓 SSH 路径；模块路径/go.sum/源码 import 均不动
+          #（SDK 仍自declare github.com/bianjiefilm/public-ai/sdk/go）。
+          export GIT_CONFIG_KEY_0=url.ssh://git@ssh.github.com:443/0xclaw-labs/public-ai.insteadOf
           export GIT_CONFIG_VALUE_0=https://github.com/bianjiefilm/public-ai
           go mod download
           go mod verify
