@@ -321,8 +321,8 @@ export function BackgroundReplacePanel({
       </div>
       <div className="row">
         <div>
-          <label>商品输入</label>
-          <select value={inputId} onChange={(e) => setInputId(e.target.value)}>
+          <label htmlFor="bg-input">商品输入</label>
+          <select id="bg-input" value={inputId} onChange={(e) => setInputId(e.target.value)}>
             {inputs.length === 0 ? <option value="">先上传或挂接商品照片</option> : null}
             {inputs.map((item) => (
               <option key={item.id} value={item.id}>
@@ -450,8 +450,9 @@ export function BackgroundReplacePanel({
           <div className="row" data-testid="bg-inspect">
             {(Object.keys(axisLabel) as AxisKey[]).map((key) => (
               <div key={key}>
-                <label>{axisLabel[key]}</label>
+                <label htmlFor={`bg-axis-${key}`}>{axisLabel[key]}</label>
                 <select
+                  id={`bg-axis-${key}`}
                   value={axes[key]}
                   onChange={(e) => setAxes({ ...axes, [key]: e.target.value })}
                 >
@@ -497,10 +498,10 @@ export function BackgroundReplacePanel({
           <table style={{ marginTop: 16 }}>
           <thead>
             <tr>
-              <th>样本</th>
-              <th>质量</th>
-              <th>模型用量</th>
-              <th>费用</th>
+              <th scope="col">样本</th>
+              <th scope="col">质量</th>
+              <th scope="col">模型用量</th>
+              <th scope="col">费用</th>
             </tr>
           </thead>
           <tbody>
@@ -508,8 +509,8 @@ export function BackgroundReplacePanel({
               <tr key={sample.kind}>
                 <td>{sample.label}</td>
                 <td>{sample.quality}</td>
-                <td>{sample.model_usage}</td>
-                <td>{sample.cost_label}</td>
+                <td className="tabular-nums">{sample.model_usage}</td>
+                <td className="tabular-nums">{sample.cost_label}</td>
               </tr>
             ))}
           </tbody>

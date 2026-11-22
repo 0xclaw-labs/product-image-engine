@@ -16,17 +16,17 @@ import {
 
 import { fetchWithRefresh } from "@/lib/api-client";
 import { loggedInHome } from "@/lib/first-image";
-import { Button } from "@/components/shadcn/button";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/shadcn/card";
-import { Badge } from "@/components/shadcn/badge";
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/shadcn/alert";
-import { Skeleton } from "@/components/shadcn/skeleton";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/shadcn/separator";
 
 type ProbeState = "loading" | "anon" | "error" | "ready";

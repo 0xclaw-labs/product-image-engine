@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert } from "@/components/ui/alert";
-import { Skeleton } from "@/components/shadcn/skeleton";
+import { Skeleton } from "@/components/ui/skeleton";
 import { jsonBody, jsonHeaders } from "@/lib/api-client";
 import { projectSourceLabel, projectStatusLabel } from "@/lib/project-labels";
 import { Input } from "@/components/ui/input";
@@ -254,12 +254,12 @@ export default function ProjectsPage() {
               <table>
                 <thead>
                   <tr>
-                    <th>名称</th>
-                    <th>状态</th>
-                    <th>用途</th>
-                    <th>尺寸</th>
-                    <th>来源</th>
-                    <th>更新时间</th>
+                    <th scope="col">名称</th>
+                    <th scope="col">状态</th>
+                    <th scope="col">用途</th>
+                    <th scope="col">尺寸</th>
+                    <th scope="col">来源</th>
+                    <th scope="col">更新时间</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -268,7 +268,7 @@ export default function ProjectsPage() {
                       <td>{p.name}</td>
                       <td>{p.status || "状态未知"}</td>
                       <td>{p.usage_kind || "—"}</td>
-                      <td>{p.width_px}×{p.height_px}</td>
+                      <td className="tabular-nums">{p.width_px}×{p.height_px}</td>
                       <td>{p.source_type || "—"}{p.source_ref ? ` · ${p.source_ref}` : ""}</td>
                       <td className="muted">{p.updated_at}</td>
                     </tr>

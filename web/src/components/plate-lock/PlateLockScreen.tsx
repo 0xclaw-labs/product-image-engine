@@ -56,7 +56,7 @@ export function PlateLockScreen(p: PlateScreenProps) {
       <div className={styles.bench} data-has-artwork={contentSrc ? "true" : "false"}>
         <div className={styles.benchMaterials} data-workspace-rail="materials" data-region="next_steps">
           <CardHeader>
-            <CardTitle>{PLATE_TITLE}</CardTitle>
+            <CardTitle id="plate-title">{PLATE_TITLE}</CardTitle>
             <CardDescription>{PLATE_PROMISE}{PLATE_SCOPE_NOTE}</CardDescription>
           </CardHeader>
           <Stepper steps={STEPS} current={stage} label="制作步骤" />

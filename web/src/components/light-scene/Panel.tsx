@@ -185,8 +185,8 @@ export function LightScenePanel({ projectId, inputs }: { projectId: string; inpu
       </p>
       <div className="row">
         <div>
-          <label>商品输入</label>
-          <select value={inputId} onChange={(e) => setInputId(e.target.value)}>
+          <label htmlFor="ls-input">商品输入</label>
+          <select id="ls-input" value={inputId} onChange={(e) => setInputId(e.target.value)}>
             {inputs.length === 0 ? <option value="">先挂接商品照片</option> : null}
             {inputs.map((item) => (
               <option key={item.id} value={item.id}>
@@ -282,10 +282,10 @@ export function LightScenePanel({ projectId, inputs }: { projectId: string; inpu
           <table style={{ marginTop: 16 }}>
           <thead>
             <tr>
-              <th>样本</th>
-              <th>质量</th>
-              <th>模型用量</th>
-              <th>费用</th>
+              <th scope="col">样本</th>
+              <th scope="col">质量</th>
+              <th scope="col">模型用量</th>
+              <th scope="col">费用</th>
             </tr>
           </thead>
           <tbody>
@@ -293,8 +293,8 @@ export function LightScenePanel({ projectId, inputs }: { projectId: string; inpu
               <tr key={sample.kind}>
                 <td>{sample.label}</td>
                 <td>{sample.quality}</td>
-                <td>{sample.model_usage}</td>
-                <td>{sample.cost_label}</td>
+                <td className="tabular-nums">{sample.model_usage}</td>
+                <td className="tabular-nums">{sample.cost_label}</td>
               </tr>
             ))}
           </tbody>

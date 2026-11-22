@@ -272,11 +272,11 @@ export function SubjectFidelityPanel({ projectId }: { projectId: string }) {
             <table>
               <thead>
                 <tr>
-                  <th>结论</th>
-                  <th>模式</th>
-                  <th>样本</th>
-                  <th>输入版本</th>
-                  <th>限制</th>
+                  <th scope="col">结论</th>
+                  <th scope="col">模式</th>
+                  <th scope="col">样本</th>
+                  <th scope="col">输入版本</th>
+                  <th scope="col">限制</th>
                 </tr>
               </thead>
               <tbody>
