@@ -51,6 +51,7 @@ export function SubjectFidelityPanel({ projectId }: { projectId: string }) {
   const [reports, setReports] = useState<FidelityReport[] | null>(null);
   const [closed, setClosed] = useState(false);
   const [notice, setNotice] = useState("");
+  const [noticeAlert, setNoticeAlert] = useState(false);
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState("fidelity");
   const [sampleClass, setSampleClass] = useState("logo_text");
@@ -77,6 +78,7 @@ export function SubjectFidelityPanel({ projectId }: { projectId: string }) {
     }
     const data = await res.json().catch(() => null);
     if (!res.ok) {
+      setNoticeAlert(true);
       setNotice(data?.error?.message ?? "主体保真记录读取失败");
       setReports([]);
       return;
@@ -115,10 +117,12 @@ export function SubjectFidelityPanel({ projectId }: { projectId: string }) {
     const data = await res.json().catch(() => null);
     setBusy(false);
     if (!res.ok) {
+      setNoticeAlert(true);
       setNotice(data?.error?.message ?? "记录失败");
       return;
     }
     const verdict = data?.report?.verdict as string | undefined;
+    setNoticeAlert(false);
     setNotice(
       verdict === "fail"
         ? "已留下未通过候选，不会当作可用商品图。"
@@ -159,15 +163,20 @@ export function SubjectFidelityPanel({ projectId }: { projectId: string }) {
           <form onSubmit={onSubmit} style={{ marginTop: 12 }}>
             <div className="row">
               <div>
-                <label>模式</label>
-                <select value={mode} onChange={(e) => setMode(e.target.value)}>
+                <label htmlFor="sf-mode">模式</label>
+                <select
+                  id="sf-mode"
+                  value={mode}
+                  onChange={(e) => setMode(e.target.value)}
+                >
                   <option value="fidelity">保真（默认，只改已确认区域）</option>
                   <option value="creative">创意（不是精确商品图）</option>
                 </select>
               </div>
               <div>
-                <label>样本类</label>
+                <label htmlFor="sf-sample-class">样本类</label>
                 <select
+                  id="sf-sample-class"
                   value={sampleClass}
                   onChange={(e) => setSampleClass(e.target.value)}
                 >
@@ -181,30 +190,44 @@ export function SubjectFidelityPanel({ projectId }: { projectId: string }) {
             </div>
             <div className="row">
               <div>
-                <label>原图引用</label>
-                <input value={inputRef} onChange={(e) => setInputRef(e.target.value)} />
+                <label htmlFor="sf-input-ref">原图引用</label>
+                <input
+                  id="sf-input-ref"
+                  value={inputRef}
+                  onChange={(e) => setInputRef(e.target.value)}
+                />
               </div>
               <div>
-                <label>输入版本</label>
+                <label htmlFor="sf-input-version">输入版本</label>
                 <input
+                  id="sf-input-version"
                   value={inputVersion}
                   onChange={(e) => setInputVersion(e.target.value)}
                 />
               </div>
               <div>
-                <label>主体 mask</label>
-                <input value={maskRef} onChange={(e) => setMaskRef(e.target.value)} />
+                <label htmlFor="sf-mask-ref">主体 mask</label>
+                <input
+                  id="sf-mask-ref"
+                  value={maskRef}
+                  onChange={(e) => setMaskRef(e.target.value)}
+                />
               </div>
               <div>
-                <label>输出 ID（可空，用于拦住未验证回执）</label>
-                <input value={outputRef} onChange={(e) => setOutputRef(e.target.value)} />
+                <label htmlFor="sf-output-ref">输出 ID（可空，用于拦住未验证回执）</label>
+                <input
+                  id="sf-output-ref"
+                  value={outputRef}
+                  onChange={(e) => setOutputRef(e.target.value)}
+                />
               </div>
             </div>
             {CHECKS.map(([name, label]) => (
               <div className="row" key={name}>
                 <div>
-                  <label>{label}</label>
+                  <label htmlFor={`sf-check-${name}`}>{label}</label>
                   <select
+                    id={`sf-check-${name}`}
                     value={checks[name]}
                     onChange={(e) =>
                       setChecks({ ...checks, [name]: e.target.value })
@@ -281,7 +304,9 @@ export function SubjectFidelityPanel({ projectId }: { projectId: string }) {
           </details>
         </>
       )}
-      {notice ? <p className="muted">{notice}</p> : null}
+      {notice ? (
+        <p role={noticeAlert ? "alert" : "status"} className="muted">{notice}</p>
+      ) : null}
     </div>
   );
 }

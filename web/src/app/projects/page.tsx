@@ -149,6 +149,8 @@ export default function ProjectsPage() {
                 <input
                   id="proj-create-width"
                   type="number"
+                  min={1}
+                  max={16384}
                   value={form.width_px}
                   onChange={(e) =>
                     setForm({ ...form, width_px: Number(e.target.value) })
@@ -160,6 +162,8 @@ export default function ProjectsPage() {
                 <input
                   id="proj-create-height"
                   type="number"
+                  min={1}
+                  max={16384}
                   value={form.height_px}
                   onChange={(e) =>
                     setForm({ ...form, height_px: Number(e.target.value) })

@@ -5,12 +5,12 @@
  * 只把历史类名映射到 --pn-* 语义角色，并保留 reset/版式/响应式事实。
  */
 :root {
-  /* 统一登录组件（@painuo/login-page）brand.accent 注入桥：
-     直取 --pn-brand-* 语义角色，不在本文件引入第二套裸色值。 */
-  --accent: var(--pn-brand-accent);
-  --accent-hover: var(--pn-brand-hover);
-  --accent-weak: var(--pn-brand-weak);
-  --on-accent: var(--pn-brand-ink);
+  /* 统一登录组件（@painuo/login-page）brand 注入桥：
+     实心品牌色统一走 --primary（下方 shadcn 别名块映射到 --pn-brand-accent），
+     这里只补 primary 未暴露的 hover 桥接。本仓 --accent 只表示「弱强调底」
+     （见下方别名块 --accent: var(--pn-brand-weak)），不在上方二次定义实心语义，
+     避免一名两义被晚声明覆盖。 */
+  --brand-hover: var(--pn-brand-hover);
 
   color-scheme: dark;
   --app-max: 1440px;
@@ -477,7 +477,10 @@ p .link,
 @tailwind components;
 @tailwind utilities;
 
-:root {
+/* 选择器与生成 aliases.css 的 [data-pn-surface][data-pn-theme] 作用域同特异性,
+   后加载的本基线胜出:--accent 固定为弱强调底,实心品牌色只走 --primary。 */
+:root,
+:root[data-pn-surface][data-pn-theme] {
   /* shadcn/ui 语义令牌:全部映射到既有 --pn-* 品牌令牌,不引入第二套色板。 */
   --background: var(--pn-bg-page);
   --foreground: var(--pn-text-primary);

@@ -134,6 +134,9 @@ function receiptFact(status: string): string {
   return "状态未知";
 }
 
+// 与服务端 sizeadapt.MaxDimension 对齐:单边尺寸上限 16384 px,下限 1 px。
+const MAX_DIMENSION = 16384;
+
 const TECHNICAL_LEAK = /provider|qwen|\bmodel\b|sha256|run_id|\bdebug\b/i;
 
 function publicOrTechnical(raw: string): { show: string; technical: string } {
@@ -188,6 +191,18 @@ export default function ProjectDetailPage() {
     width_px: 0,
     height_px: 0,
   });
+  // 字段级错误:key 与控件 id 前缀对应;错误节点 id 为 `<id>-error`,
+  // 控件经 aria-describedby 指向该节点,失败字段 aria-invalid 置真。
+  const [fieldErrors, setFieldErrors] = useState<{
+    name?: string;
+    width?: string;
+    height?: string;
+  }>({});
+  const [attachErrors, setAttachErrors] = useState<{
+    assetId?: string;
+    snapshotName?: string;
+    size?: string;
+  }>({});
   const [newInput, setNewInput] = useState({
     platform_asset_id: "",
     snapshot_name: "",
@@ -317,6 +332,17 @@ export default function ProjectDetailPage() {
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
+    const errors: typeof fieldErrors = {};
+    if (!form.name.trim()) errors.name = "请填写工程名称。";
+    if (!Number.isFinite(form.width_px) || form.width_px < 1 || form.width_px > MAX_DIMENSION)
+      errors.width = `宽度须在 1–${MAX_DIMENSION} px 之间。`;
+    if (!Number.isFinite(form.height_px) || form.height_px < 1 || form.height_px > MAX_DIMENSION)
+      errors.height = `高度须在 1–${MAX_DIMENSION} px 之间。`;
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      setNotice("请先修正表单里标出的问题，再保存。");
+      return;
+    }
     setSaving(true);
     setNotice("");
     try {
@@ -330,6 +356,7 @@ export default function ProjectDetailPage() {
         setNotice(data?.error?.message ?? "保存失败");
         return;
       }
+      setFieldErrors({});
       setNotice("已保存");
       await load();
     } catch {
@@ -341,8 +368,12 @@ export default function ProjectDetailPage() {
 
   async function addInput(e: React.FormEvent) {
     e.preventDefault();
-    if (!newInput.platform_asset_id.trim()) {
-      setAttachHint("请先填写素材编号，再挂接。");
+    const errs: typeof attachErrors = {};
+    if (!newInput.platform_asset_id.trim()) errs.assetId = "请先填写素材编号，再挂接。";
+    if (newInput.snapshot_size < 0) errs.size = "大小不能为负数。";
+    setAttachErrors(errs);
+    if (Object.keys(errs).length > 0) {
+      setAttachHint(errs.assetId ?? errs.size ?? "");
       setAttachOpen(true);
       return;
     }
@@ -761,9 +792,19 @@ export default function ProjectDetailPage() {
               <input
                 id="proj-name"
                 value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                onChange={(e) => {
+                  setForm({ ...form, name: e.target.value });
+                  setFieldErrors((cur) => ({ ...cur, name: undefined }));
+                }}
                 required
+                aria-invalid={!!fieldErrors.name}
+                aria-describedby={fieldErrors.name ? "proj-name-error" : undefined}
               />
+              {fieldErrors.name ? (
+                <p id="proj-name-error" role="alert" className={styles.fieldError}>
+                  {fieldErrors.name}
+                </p>
+              ) : null}
             </div>
             <div>
               <label htmlFor="proj-status">状态</label>
@@ -794,22 +835,42 @@ export default function ProjectDetailPage() {
               <input
                 id="proj-width"
                 type="number"
+                min={1}
+                max={MAX_DIMENSION}
                 value={form.width_px}
-                onChange={(e) =>
-                  setForm({ ...form, width_px: Number(e.target.value) })
-                }
+                onChange={(e) => {
+                  setForm({ ...form, width_px: Number(e.target.value) });
+                  setFieldErrors((cur) => ({ ...cur, width: undefined }));
+                }}
+                aria-invalid={!!fieldErrors.width}
+                aria-describedby={fieldErrors.width ? "proj-width-error" : undefined}
               />
+              {fieldErrors.width ? (
+                <p id="proj-width-error" role="alert" className={styles.fieldError}>
+                  {fieldErrors.width}
+                </p>
+              ) : null}
             </div>
             <div>
               <label htmlFor="proj-height">高(px)</label>
               <input
                 id="proj-height"
                 type="number"
+                min={1}
+                max={MAX_DIMENSION}
                 value={form.height_px}
-                onChange={(e) =>
-                  setForm({ ...form, height_px: Number(e.target.value) })
-                }
+                onChange={(e) => {
+                  setForm({ ...form, height_px: Number(e.target.value) });
+                  setFieldErrors((cur) => ({ ...cur, height: undefined }));
+                }}
+                aria-invalid={!!fieldErrors.height}
+                aria-describedby={fieldErrors.height ? "proj-height-error" : undefined}
               />
+              {fieldErrors.height ? (
+                <p id="proj-height-error" role="alert" className={styles.fieldError}>
+                  {fieldErrors.height}
+                </p>
+              ) : null}
             </div>
           </div>
           </details>
@@ -899,17 +960,27 @@ export default function ProjectDetailPage() {
         <form id="proj-attach-form" onSubmit={addInput} className="mt-12">
           <div className="row">
             <div>
-              <label>平台 asset_id</label>
+              <label htmlFor="proj-attach-asset-id">平台 asset_id</label>
               <input
+                id="proj-attach-asset-id"
                 value={newInput.platform_asset_id}
-                onChange={(e) =>
-                  setNewInput({ ...newInput, platform_asset_id: e.target.value })
-                }
+                onChange={(e) => {
+                  setNewInput({ ...newInput, platform_asset_id: e.target.value });
+                  setAttachErrors((cur) => ({ ...cur, assetId: undefined }));
+                }}
+                aria-invalid={!!attachErrors.assetId}
+                aria-describedby={attachErrors.assetId ? "proj-attach-asset-id-error" : undefined}
               />
+              {attachErrors.assetId ? (
+                <p id="proj-attach-asset-id-error" role="alert" className={styles.fieldError}>
+                  {attachErrors.assetId}
+                </p>
+              ) : null}
             </div>
             <div>
-              <label>快照文件名</label>
+              <label htmlFor="proj-attach-snapshot-name">快照文件名</label>
               <input
+                id="proj-attach-snapshot-name"
                 value={newInput.snapshot_name}
                 onChange={(e) =>
                   setNewInput({ ...newInput, snapshot_name: e.target.value })
@@ -917,14 +988,24 @@ export default function ProjectDetailPage() {
               />
             </div>
             <div>
-              <label>大小(字节)</label>
+              <label htmlFor="proj-attach-size">大小(字节)</label>
               <input
+                id="proj-attach-size"
                 type="number"
+                min={0}
                 value={newInput.snapshot_size}
-                onChange={(e) =>
-                  setNewInput({ ...newInput, snapshot_size: Number(e.target.value) })
-                }
+                onChange={(e) => {
+                  setNewInput({ ...newInput, snapshot_size: Number(e.target.value) });
+                  setAttachErrors((cur) => ({ ...cur, size: undefined }));
+                }}
+                aria-invalid={!!attachErrors.size}
+                aria-describedby={attachErrors.size ? "proj-attach-size-error" : undefined}
               />
+              {attachErrors.size ? (
+                <p id="proj-attach-size-error" role="alert" className={styles.fieldError}>
+                  {attachErrors.size}
+                </p>
+              ) : null}
             </div>
           </div>
         </form>
