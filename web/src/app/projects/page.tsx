@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { jsonBody, jsonHeaders } from "@/lib/api-client";
 import { projectSourceLabel, projectStatusLabel } from "@/lib/project-labels";
 import { Input } from "@/components/ui/input";
+import { SelectField } from "@/components/ui/select-field";
 
 interface Project {
   id: string;
@@ -172,17 +173,19 @@ export default function ProjectsPage() {
               </div>
               <div>
                 <label htmlFor="proj-create-source">来源类型</label>
-                <select
+                <SelectField
                   id="proj-create-source"
+                  name="proj-create-source"
                   value={form.source_type}
-                  onChange={(e) =>
-                    setForm({ ...form, source_type: e.target.value })
+                  onChange={(v) =>
+                    setForm({ ...form, source_type: v })
                   }
-                >
-                  <option value="standalone">独立制作(无订单)</option>
-                  <option value="order">挂接订单</option>
-                  <option value="campaign">挂接活动</option>
-                </select>
+                  options={[
+                    { value: "standalone", label: "独立制作(无订单)" },
+                    { value: "order", label: "挂接订单" },
+                    { value: "campaign", label: "挂接活动" },
+                  ]}
+                />
               </div>
               {form.source_type !== "standalone" ? (
                 <div>

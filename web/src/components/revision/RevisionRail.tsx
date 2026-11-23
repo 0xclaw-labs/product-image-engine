@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { displayCostCents } from "@/lib/revision";
+import { SelectField } from "@/components/ui/select-field";
 
 type VersionView = {
   label?: string;
@@ -437,15 +438,29 @@ export function RevisionRail({ projectId }: { projectId?: string }) {
                 <div className="row">
                   <div>
                     <label htmlFor="compare-left">左</label>
-                    <select id="compare-left" value={left} onChange={(e) => { setLeft(e.target.value); setCompared(false); }}>
-                      {labels.map((label) => <option key={label} value={label}>{label}{label === adopted ? " · 已采用" : ""}</option>)}
-                    </select>
+                    <SelectField
+                      id="compare-left"
+                      name="compare-left"
+                      value={left}
+                      onChange={(v) => { setLeft(v); setCompared(false); }}
+                      options={labels.map((label) => ({
+                        value: label,
+                        label: `${label}${label === adopted ? " · 已采用" : ""}`,
+                      }))}
+                    />
                   </div>
                   <div>
                     <label htmlFor="compare-right">右</label>
-                    <select id="compare-right" value={right} onChange={(e) => { setRight(e.target.value); setCompared(false); }}>
-                      {labels.map((label) => <option key={label} value={label}>{label}{label === adopted ? " · 已采用" : ""}</option>)}
-                    </select>
+                    <SelectField
+                      id="compare-right"
+                      name="compare-right"
+                      value={right}
+                      onChange={(v) => { setRight(v); setCompared(false); }}
+                      options={labels.map((label) => ({
+                        value: label,
+                        label: `${label}${label === adopted ? " · 已采用" : ""}`,
+                      }))}
+                    />
                   </div>
                 </div>
                 <div className="media-actions">
