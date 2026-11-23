@@ -24,6 +24,7 @@ import { RevisionRail } from "@/components/revision/RevisionRail";
 import { SourceImagePanel } from "@/components/source-image/Panel";
 import { WorkspaceShell } from "@/components/workspace/WorkspaceShell";
 import { MatrixDraftPanel } from "@/components/matrix-draft/Panel";
+import { SelectField } from "@/components/ui/select-field";
 
 interface Project {
   id: string;
@@ -808,15 +809,17 @@ export default function ProjectDetailPage() {
             </div>
             <div>
               <label htmlFor="proj-status">状态</label>
-              <select
+              <SelectField
                 id="proj-status"
+                name="proj-status"
                 value={form.status}
-                onChange={(e) => setForm({ ...form, status: e.target.value })}
-              >
-                <option value="draft">草稿</option>
-                <option value="active">进行中</option>
-                <option value="archived">已归档</option>
-              </select>
+                onChange={(v) => setForm({ ...form, status: v })}
+                options={[
+                  { value: "draft", label: "草稿" },
+                  { value: "active", label: "进行中" },
+                  { value: "archived", label: "已归档" },
+                ]}
+              />
             </div>
           </div>
           <div className="row">
@@ -1360,18 +1363,17 @@ export default function ProjectDetailPage() {
           <div className="row">
             <div>
               <label htmlFor="sa-source">源成果</label>
-              <select
+              <SelectField
                 id="sa-source"
+                name="sa-source"
                 value={saSource}
-                onChange={(e) => setSaSource(e.target.value)}
-              >
-                <option value="">— 选择 —</option>
-                {outputs.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.file_name || o.id}({o.result_size}B)
-                  </option>
-                ))}
-              </select>
+                onChange={setSaSource}
+                placeholder="— 选择 —"
+                options={outputs.map((o) => ({
+                  value: o.id,
+                  label: `${o.file_name || o.id}(${o.result_size}B)`,
+                }))}
+              />
             </div>
             <div>
               <label htmlFor="sa-png">源 PNG 文件</label>
@@ -1384,14 +1386,16 @@ export default function ProjectDetailPage() {
             </div>
             <div>
               <label htmlFor="sa-format">输出格式</label>
-              <select
+              <SelectField
                 id="sa-format"
+                name="sa-format"
                 value={saFormat}
-                onChange={(e) => setSaFormat(e.target.value)}
-              >
-                <option value="png">PNG</option>
-                <option value="jpeg">JPEG(quality 90)</option>
-              </select>
+                onChange={setSaFormat}
+                options={[
+                  { value: "png", label: "PNG" },
+                  { value: "jpeg", label: "JPEG(quality 90)" },
+                ]}
+              />
             </div>
           </div>
           <div className="mt-8">

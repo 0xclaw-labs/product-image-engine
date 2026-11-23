@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { SelectField } from "@/components/ui/select-field";
 import {
   BILLING_PENDING,
   HONESTY,
@@ -186,14 +187,17 @@ export function LightScenePanel({ projectId, inputs }: { projectId: string; inpu
       <div className="row">
         <div>
           <label htmlFor="ls-input">商品输入</label>
-          <select id="ls-input" value={inputId} onChange={(e) => setInputId(e.target.value)}>
-            {inputs.length === 0 ? <option value="">先挂接商品照片</option> : null}
-            {inputs.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.snapshot_name || item.id}
-              </option>
-            ))}
-          </select>
+          <SelectField
+            id="ls-input"
+            name="ls-input"
+            value={inputId}
+            onChange={setInputId}
+            placeholder={inputs.length === 0 ? "先挂接商品照片" : undefined}
+            options={inputs.map((item) => ({
+              value: item.id,
+              label: item.snapshot_name || item.id,
+            }))}
+          />
         </div>
         <div>
           <label>光影意图</label>

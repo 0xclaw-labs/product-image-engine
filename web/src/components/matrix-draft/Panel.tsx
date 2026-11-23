@@ -14,6 +14,7 @@ import {
 } from "@/lib/matrix-draft";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SelectField } from "@/components/ui/select-field";
 
 // datetime-local 取值格式:YYYY-MM-DDTHH:mm;到期时间不允许早于当前时刻。
 function nowLocalInput(): string {
@@ -168,18 +169,17 @@ export function MatrixDraftPanel({
       <div className="row">
         <div>
           <label htmlFor="md-output">成果</label>
-          <select
+          <SelectField
             id="md-output"
+            name="md-output"
             value={outputId}
-            onChange={(e) => setOutputId(e.target.value)}
-          >
-            <option value="">— 选择 —</option>
-            {outputs.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.file_name || o.id}
-              </option>
-            ))}
-          </select>
+            onChange={setOutputId}
+            placeholder="— 选择 —"
+            options={outputs.map((o) => ({
+              value: o.id,
+              label: o.file_name || o.id,
+            }))}
+          />
         </div>
         <div>
           <label htmlFor="md-license">license 引用(必填)</label>

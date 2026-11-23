@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { SelectField } from "@/components/ui/select-field";
 import { BILLING_PENDING, CAMERA_MOVES, canStartShowcase, presentShowcaseJob, sameRecord } from "@/lib/showcase-video";
 import { presentShowcaseProduction } from "@/lib/showcase-video-production";
 import { maySubmitShowcase } from "@/components/showcase-video/submit-guard";
@@ -139,17 +140,19 @@ export function ShowcaseVideoPanel({ projectId, images }: { projectId: string; i
         <Badge>{job?.status_label || (job?.job_status === "failed" ? "失败" : "待确认")}</Badge>
       </p>
       {images.length === 0 ? <p>没有产品图就不能发起展示视频。</p> : null}
-      <label>
-        产品图
-        <select value={imageId} onChange={(e) => setImageId(e.target.value)} disabled={images.length === 0}>
-          <option value="">选择已有产品图</option>
-          {images.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.label || item.id}
-            </option>
-          ))}
-        </select>
-      </label>
+      <label htmlFor="showcase-image">产品图</label>
+      <SelectField
+        id="showcase-image"
+        name="showcase-image"
+        value={imageId}
+        onChange={setImageId}
+        disabled={images.length === 0}
+        placeholder="选择已有产品图"
+        options={images.map((item) => ({
+          value: item.id,
+          label: item.label || item.id,
+        }))}
+      />
       <fieldset>
         <legend>运镜</legend>
         {CAMERA_MOVES.map((item) => (

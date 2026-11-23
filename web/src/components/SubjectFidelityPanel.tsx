@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { SelectField } from "@/components/ui/select-field";
 
 const CHECKS = [
   ["product_count", "商品数量"],
@@ -164,28 +165,26 @@ export function SubjectFidelityPanel({ projectId }: { projectId: string }) {
             <div className="row">
               <div>
                 <label htmlFor="sf-mode">模式</label>
-                <select
+                <SelectField
                   id="sf-mode"
+                  name="sf-mode"
                   value={mode}
-                  onChange={(e) => setMode(e.target.value)}
-                >
-                  <option value="fidelity">保真（默认，只改已确认区域）</option>
-                  <option value="creative">创意（不是精确商品图）</option>
-                </select>
+                  onChange={setMode}
+                  options={[
+                    { value: "fidelity", label: "保真（默认，只改已确认区域）" },
+                    { value: "creative", label: "创意（不是精确商品图）" },
+                  ]}
+                />
               </div>
               <div>
                 <label htmlFor="sf-sample-class">样本类</label>
-                <select
+                <SelectField
                   id="sf-sample-class"
+                  name="sf-sample-class"
                   value={sampleClass}
-                  onChange={(e) => setSampleClass(e.target.value)}
-                >
-                  {SAMPLES.map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setSampleClass}
+                  options={SAMPLES.map(([value, label]) => ({ value, label }))}
+                />
               </div>
             </div>
             <div className="row">
@@ -226,17 +225,19 @@ export function SubjectFidelityPanel({ projectId }: { projectId: string }) {
               <div className="row" key={name}>
                 <div>
                   <label htmlFor={`sf-check-${name}`}>{label}</label>
-                  <select
+                  <SelectField
                     id={`sf-check-${name}`}
+                    name={`sf-check-${name}`}
                     value={checks[name]}
-                    onChange={(e) =>
-                      setChecks({ ...checks, [name]: e.target.value })
+                    onChange={(v) =>
+                      setChecks({ ...checks, [name]: v })
                     }
-                  >
-                    <option value="unknown">待确认</option>
-                    <option value="pass">未发现漂移</option>
-                    <option value="fail">有漂移</option>
-                  </select>
+                    options={[
+                      { value: "unknown", label: "待确认" },
+                      { value: "pass", label: "未发现漂移" },
+                      { value: "fail", label: "有漂移" },
+                    ]}
+                  />
                 </div>
               </div>
             ))}

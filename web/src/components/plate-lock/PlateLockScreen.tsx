@@ -5,6 +5,7 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
+import { SelectField } from "@/components/ui/select-field";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Stepper } from "@/components/ui/stepper";
 import { Stage } from "@/components/workspace/Stage";
@@ -70,9 +71,17 @@ export function PlateLockScreen(p: PlateScreenProps) {
             <form onSubmit={e => { e.preventDefault(); p.onQuote?.(); }} data-testid="plate-form">
               {supported.length > 1 ? (
                 <Field htmlFor="plate-input" label="商品照片" hint="只列出在已验证范围内的照片">
-                  <select id="plate-input" value={chosen?.input_id} onChange={e => p.onInput?.(e.target.value)} aria-describedby="plate-input-hint">
-                    {supported.map(i => <option key={i.input_id} value={i.input_id}>{KIND_LABEL[i.kind] ?? "样本"} · {i.canvas.width_px}×{i.canvas.height_px}</option>)}
-                  </select>
+                  <SelectField
+                    id="plate-input"
+                    name="plate-input"
+                    value={chosen?.input_id ?? ""}
+                    onChange={(v) => p.onInput?.(v)}
+                    ariaDescribedby="plate-input-hint"
+                    options={supported.map((i) => ({
+                      value: i.input_id,
+                      label: `${KIND_LABEL[i.kind] ?? "样本"} · ${i.canvas.width_px}×${i.canvas.height_px}`,
+                    }))}
+                  />
                 </Field>
               ) : <p data-testid="plate-photo">商品照片：{KIND_LABEL[chosen?.kind ?? ""] ?? "样本"} · 输出 {chosen?.canvas.width_px}×{chosen?.canvas.height_px}</p>}
               <Field htmlFor="plate-background" label="背景描述" hint="1 到 200 个字，例如：深蓝色渐变摄影棚背景，柔和顶光">

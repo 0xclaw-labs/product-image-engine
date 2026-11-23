@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { SelectField } from "@/components/ui/select-field";
 import {
   BILLING_PENDING,
   HONESTY,
@@ -322,14 +323,17 @@ export function BackgroundReplacePanel({
       <div className="row">
         <div>
           <label htmlFor="bg-input">商品输入</label>
-          <select id="bg-input" value={inputId} onChange={(e) => setInputId(e.target.value)}>
-            {inputs.length === 0 ? <option value="">先上传或挂接商品照片</option> : null}
-            {inputs.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.snapshot_name || item.id}
-              </option>
-            ))}
-          </select>
+          <SelectField
+            id="bg-input"
+            name="bg-input"
+            value={inputId}
+            onChange={setInputId}
+            placeholder={inputs.length === 0 ? "先上传或挂接商品照片" : undefined}
+            options={inputs.map((item) => ({
+              value: item.id,
+              label: item.snapshot_name || item.id,
+            }))}
+          />
         </div>
         <div>
           <label>背景方向</label>
@@ -451,15 +455,17 @@ export function BackgroundReplacePanel({
             {(Object.keys(axisLabel) as AxisKey[]).map((key) => (
               <div key={key}>
                 <label htmlFor={`bg-axis-${key}`}>{axisLabel[key]}</label>
-                <select
+                <SelectField
                   id={`bg-axis-${key}`}
+                  name={`bg-axis-${key}`}
                   value={axes[key]}
-                  onChange={(e) => setAxes({ ...axes, [key]: e.target.value })}
-                >
-                  <option value="unknown">未检查</option>
-                  <option value="pass">未见改写</option>
-                  <option value="fail">已改写</option>
-                </select>
+                  onChange={(v) => setAxes({ ...axes, [key]: v })}
+                  options={[
+                    { value: "unknown", label: "未检查" },
+                    { value: "pass", label: "未见改写" },
+                    { value: "fail", label: "已改写" },
+                  ]}
+                />
               </div>
             ))}
           </div>
