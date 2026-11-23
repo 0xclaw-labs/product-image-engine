@@ -21,7 +21,7 @@ export function SourceImageScreen(p: ScreenProps) {
   const writeDenied=sourceWritesDenied(p.capabilities);
   return <Card data-source-entry="true" data-runtime-ready={mode?.ready === true ? "true":"false"}>
     <CardHeader><CardTitle>普通文字生成</CardTitle><CardDescription>普通概念图，不宣称商品主体保真。原输出为 1024×1024，1 张；不会改写工程原有尺寸。</CardDescription></CardHeader>
-    {mode?.ready !== true ? <p role="status">{mode?.can_quote ? "报价与明确确认可用；自动结果恢复尚未配置，完整生成闭环尚不可用。" : "正式生成尚未配置或当前工程无写权限；已有记录仍需服务端授权读取。"}</p> : null}
+    {mode?.ready !== true ? <p role="status">{mode?.can_quote ? "报价与确认可用；自动结果恢复尚未配置。" : "正式生成未配置或无写权限；已有记录仍需授权读取。"}</p> : null}
     {p.projectID ? <><label>文字描述<textarea rows={3} value={p.prompt ?? ""} onChange={e=>p.onPrompt?.(e.target.value)} placeholder="例如：蓝色纸盒，浅灰棚拍" /></label><div className="row"><Button type="button" disabled={!!p.busy || mode?.can_quote !== true || !(p.prompt ?? "").trim()} onClick={p.onQuote}>获取报价</Button><Button type="button" variant="outline" disabled={!!p.busy} onClick={p.onNew}>明确重新生成（新请求）</Button></div></> : <Button type="button" disabled={!!p.busy} onClick={p.onQuote}>创建个人普通图工程（1024×1024）</Button>}
     {v ? <><p>{requestState(v)}</p>
       <p>付款人：{v.payment.payer_label}</p>

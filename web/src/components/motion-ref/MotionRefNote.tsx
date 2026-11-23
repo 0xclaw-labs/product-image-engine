@@ -120,7 +120,6 @@ function MotionRefRow({ row, busy, onRecord }: { row: MotionDeclaration; busy: b
       <p>资产 {row.asset_id}</p>
       <p>内容哈希 {row.content_hash}</p>
       <p>修订 {row.revision_id}</p>
-      <p>摘要 {row.digest}</p>
       <p>商品重生成 {row.product_regeneration ? "是" : "否"}，模型调用 {row.model_call_count ?? 0}</p>
       <label>
         价格

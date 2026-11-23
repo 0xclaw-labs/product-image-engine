@@ -299,7 +299,7 @@ export function BackgroundReplacePanel({
           上传后默认保真,只改背景。Logo、包装文字、规格和结构不能被背景生成改写。{caps?.honesty ?? HONESTY}
         </CardDescription>
       </CardHeader>
-      <p className="muted">上传 → 确认报价 → 生成，或用背景图和蒙版锁定主体。也可以只上传蒙版，让模型生成背景后再锁回主体像素。</p>
+      <p className="muted">上传、确认报价后生成；也可只上传蒙版生成背景，再锁回主体像素。</p>
       <p>
         <Badge variant="warn">{bill || BILLING_PENDING}</Badge>{" "}
         <Badge>质量 {active?.quality ?? "unknown"}</Badge>{" "}

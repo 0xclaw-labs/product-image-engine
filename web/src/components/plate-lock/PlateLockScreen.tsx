@@ -124,7 +124,7 @@ export function PlateLockScreen(p: PlateScreenProps) {
             candidateBadge={p.loading ? "正在读取" : v && v.confirmed && pl?.derivation_state === "pending" ? "正在生成并检查" : summary?.label}
             candidateTone={summary?.tone ?? "warn"}
             selected={!!v?.selected}
-            empty={<p>{p.loading ? "正在读取……" : v && v.confirmed && pl?.derivation_state === "pending" ? "正在生成背景并检查商品……离开页面不会重复扣费；回来会继续读取同一请求。" : "结果会显示在这里。选照片、写背景、确认费用，步骤没有增加。"}</p>}
+            empty={<p>{p.loading ? "正在读取……" : v && v.confirmed && pl?.derivation_state === "pending" ? "正在生成并检查；离开不会重复扣费，回来可继续读取。" : "结果将显示在这里。"}</p>}
           />
           {resultReady ? (
             <section aria-label="结果与商品检查" data-testid="plate-result" data-candidate={pl!.candidate_state} data-page-pattern="review" data-region="subject_preview">

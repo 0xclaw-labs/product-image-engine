@@ -144,7 +144,7 @@ export function TextImagePanel({ projectId, historyOnly=false }: { projectId?: s
       <CardHeader>
         <CardTitle>{historyOnly ? "旧文字生成历史（只读）" : "只用文字描述"}</CardTitle>
         <CardDescription>
-          不上传实物照片也可以开始。夹具和任务结果可以查看，那不是模型出图。图像模型返回的字节可以打开，主体保真未核实，计费未通过，生产未授权。没有真实保真结果时仍标明真实出图未完成。
+          不上传实物照片也可以开始；示例与历史结果仅供查看，那不是模型出图。主体保真未核实，计费未通过，生产未授权。
         </CardDescription>
       </CardHeader>
       <p>
