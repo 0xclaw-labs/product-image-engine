@@ -15,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SelectField } from "@/components/ui/select-field";
+import { DateTimePicker } from "@/components/ui/date-time-picker";
 
 // datetime-local 取值格式:YYYY-MM-DDTHH:mm;到期时间不允许早于当前时刻。
 function nowLocalInput(): string {
@@ -200,17 +201,19 @@ export function MatrixDraftPanel({
         </div>
         <div>
           <label htmlFor="md-expiry">license 到期(可选,本地时间)</label>
-          <Input
+          <DateTimePicker
             id="md-expiry"
-            type="datetime-local"
-            min={expiryMin}
+            name="license_expires_at"
             value={licenseExpiresAt}
-            onChange={(e) => {
-              setLicenseExpiresAt(e.target.value);
+            onChange={(v) => {
+              setLicenseExpiresAt(v);
               setExpiryError("");
             }}
+            withTime
+            min={expiryMin}
             aria-invalid={!!expiryError}
             aria-describedby={expiryError ? "md-expiry-error" : undefined}
+            testid="md-expiry"
           />
           {expiryError ? (
             <p id="md-expiry-error" role="alert">{expiryError}</p>

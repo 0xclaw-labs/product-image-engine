@@ -1,7 +1,7 @@
 // ProductImage 表单可访问性加固回归(D-forms P1):
 // - 字段 id 与 label htmlFor 配对;
 // - 错误节点 id 与 aria-describedby/aria-invalid 锚点成对;
-// - number 输入带 min/max;datetime-local 带 min。
+// - number 输入带 min/max;日期走 Popover+Calendar,hidden input 承载提交值。
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { readFileSync } from "node:fs";
@@ -26,8 +26,17 @@ describe("矩阵草案面板可访问性", () => {
       expect(html).toContain(`id="${id}"`);
       expect(html).toContain(`for="${id}"`);
     }
-    expect(html).toContain('type="datetime-local"');
-    expect(html).toMatch(/id="md-expiry"[^>]*min="\d{4}-\d{2}-\d{2}T\d{2}:\d{2}"/);
+    // 等价替换:原生 datetime-local 不再外露;触发器可访问、hidden input 承载提交值,
+    // 早于 min 的日期在日历上禁用(禁选逻辑见 date-time-picker dayDisabled)。
+    expect(html).toContain('data-testid="md-expiry-trigger"');
+    expect(html).toContain('id="md-expiry"');
+    expect(html).toContain('type="hidden"');
+    const expirySource = readFileSync(
+      path.join(process.cwd(), "src/components/ui/date-time-picker.tsx"),
+      "utf8"
+    );
+    expect(expirySource).toContain("dayDisabled");
+    expect(expirySource).toContain("disabled={dayDisabled(dayStr)}");
   });
 
   it("license 与到期错误锚点 id 存在,控件接 aria-describedby", () => {

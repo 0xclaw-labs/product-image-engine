@@ -62,12 +62,17 @@ export default function EcoTopNav({
         {currentApp.display}
       </span>
       {currentApp.navState === "degraded" ? (
-        <span className={styles.badgeState} title="注册表标记为内部降级；不代表生产就绪">
-          内部预览
+        <span className={styles.badgeState} data-nav-badge="degraded">
+          功能逐步开放
         </span>
       ) : currentApp.navState === "unavailable" ? (
         <span className={styles.badgeState} title="注册表没读到当前应用；只渲染安全壳">
           状态待确认
+        </span>
+      ) : null}
+      {process.env.NODE_ENV !== "production" ? (
+        <span data-dev-only="true" data-internal-nav-state={currentApp.navState}>
+          内部标识
         </span>
       ) : null}
       <span className={`${styles.srOnly}`}>当前应用</span>

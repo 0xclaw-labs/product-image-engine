@@ -35,7 +35,9 @@ describe("EcoTopNav 标记", () => {
     expect(html).toContain('data-history-visible="true"');
     expect(html).toContain('data-useful-mature="false"');
     expect(html).toContain('data-nav-state="degraded"');
-    expect(html).toContain("内部预览");
+    // 生产面不出现内部徽章文案；degraded 态只给用户态可读文案，内部状态留在 data-* 属性。
+    expect(html).not.toContain("内部预览");
+    expect(html).toContain("功能逐步开放");
     expect(html).toContain("产品图");
     expect(html).toContain("个人");
     expect(html).toContain("¥12.50");

@@ -2,9 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { dynamicAdLabel, isMotionDigest, NOT_FINISHED_COPY, type MotionDeclaration } from "@/lib/motion-ref";
+import { SelectField } from "@/components/ui/select-field";
 
 type ListBody = { declarations?: MotionDeclaration[]; error?: { message?: string } };
 type OneBody = { declaration?: MotionDeclaration; error?: { message?: string } };
+
+const isDev = process.env.NODE_ENV !== "production";
 
 export function MotionRefNote({ projectId }: { projectId?: string }) {
   const [closed, setClosed] = useState<boolean | null>(null);
@@ -38,6 +41,11 @@ export function MotionRefNote({ projectId }: { projectId?: string }) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // 候选版本回填后：默认选中当前版本（首条），不覆盖用户已选。
+  useEffect(() => {
+    setRevisionID((cur) => cur || rows[0]?.revision_id || "");
+  }, [rows]);
 
   async function declare() {
     if (!projectId || !revisionID.trim()) return;
@@ -95,10 +103,19 @@ export function MotionRefNote({ projectId }: { projectId?: string }) {
       {closed ? <p>这个环境还没有打开 Motion 引用。还没生成成片。</p> : null}
       {projectId && closed === false ? (
         <div>
-          <label>
-            已采用修订
-            <input value={revisionID} onChange={(e) => setRevisionID(e.target.value)} />
-          </label>
+          <label htmlFor="md-revision-version">采用版本</label>
+          <SelectField
+            id="md-revision-version"
+            name="revision_id"
+            value={revisionID}
+            onChange={setRevisionID}
+            placeholder="— 选择版本 —"
+            options={rows.map((row, index) => ({
+              value: row.revision_id ?? `revision-${index}`,
+              label: `版本 ${row.revision_id ?? index + 1} · ${shortCopy(row)}`,
+            }))}
+            data-testid="motion-ref-revision-select"
+          />
           <button type="button" disabled={busy} onClick={() => void declare()}>形成引用</button>
           {rows.map((row) => (
             <MotionRefRow key={row.id || row.revision_id} row={row} busy={busy} onRecord={record} />
@@ -106,6 +123,26 @@ export function MotionRefNote({ projectId }: { projectId?: string }) {
         </div>
       ) : null}
       {notice ? <p role="alert">{notice}</p> : null}
+      {isDev ? (
+        <details data-technical="true" data-dev-only="true">
+          <summary>技术详情（仅开发环境可见）</summary>
+          <ul>
+            {rows.map((row) => (
+              <li
+                key={row.id || row.revision_id}
+                data-asset-id={row.asset_id}
+                data-content-hash={row.content_hash}
+                data-revision-id={row.revision_id}
+                data-model-call-count={row.model_call_count ?? 0}
+              >
+                digest：{row.digest ?? "—"}；asset_id：{row.asset_id ?? "—"}；content_hash：
+                {row.content_hash ?? "—"}；revision_id：{row.revision_id ?? "—"}；model_call_count：
+                {row.model_call_count ?? 0}
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
     </section>
   );
 }
@@ -115,12 +152,13 @@ function MotionRefRow({ row, busy, onRecord }: { row: MotionDeclaration; busy: b
   const [color, setColor] = useState("");
   const copy = safeCopy(row);
   return (
-    <article>
+    <article
+      data-asset-id={row.asset_id}
+      data-content-hash={row.content_hash}
+      data-revision-id={row.revision_id}
+      data-model-call-count={row.model_call_count ?? 0}
+    >
       <p>{copy}</p>
-      <p>资产 {row.asset_id}</p>
-      <p>内容哈希 {row.content_hash}</p>
-      <p>修订 {row.revision_id}</p>
-      <p>商品重生成 {row.product_regeneration ? "是" : "否"}，模型调用 {row.model_call_count ?? 0}</p>
       <label>
         价格
         <input value={price} onChange={(e) => setPrice(e.target.value)} />
@@ -153,4 +191,8 @@ function safeCopy(row: MotionDeclaration): string {
   } catch {
     return NOT_FINISHED_COPY;
   }
+}
+
+function shortCopy(row: MotionDeclaration): string {
+  return safeCopy(row).slice(0, 12);
 }
