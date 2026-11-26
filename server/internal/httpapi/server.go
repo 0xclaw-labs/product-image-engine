@@ -16,6 +16,7 @@ import (
 	"github.com/bianjiefilm/product-image-engine/server/internal/billassemble"
 	"github.com/bianjiefilm/product-image-engine/server/internal/buildinfo"
 	"github.com/bianjiefilm/product-image-engine/server/internal/config"
+	"github.com/bianjiefilm/product-image-engine/server/internal/crossappreturn"
 	"github.com/bianjiefilm/product-image-engine/server/internal/imagetmpl"
 	"github.com/bianjiefilm/product-image-engine/server/internal/matrixdraftclient"
 	"github.com/bianjiefilm/product-image-engine/server/internal/platform"
@@ -40,6 +41,8 @@ type Server struct {
 	Consume *ConsumeAdvisor
 	// Registry 应用登记表(HUI-1745 I1;nil 时回执/返回来源 fail-closed)。
 	Registry *appregistry.Manifest
+	// CrossApp 跨应用续接与不可变候选回流协调器(HUI-1745;nil 时惰性初始化)。
+	CrossApp *crossappreturn.Coordinator
 	// MatrixDrafts 是真实矩阵持久草稿服务客户端(HUI-2388 源端动作)。
 	// nil 时送矩阵端点 fail-closed 503,不伪造草稿。
 	MatrixDrafts *matrixdraftclient.Client
@@ -63,6 +66,7 @@ type Server struct {
 	// 惰性初始化;semMu 仅保护初始化。
 	semMu          sync.Mutex
 	batchSubmitSem chan struct{}
+	crossAppMu     sync.Mutex
 }
 
 // TextImagePainter 只提供图片字节。调用它不等于平台任务成功。
@@ -130,6 +134,13 @@ func (s *Server) Router() http.Handler {
 	mux.Handle("POST /api/v1/projects/{id}/campaign-selection", s.guard(true, s.handleSelectCampaignVersion))
 	mux.Handle("GET /api/v1/projects/{id}/receipts", s.guard(true, s.handleListReceipts))
 	mux.Handle("POST /api/v1/receipts/{id}/resend", s.guard(true, s.handleResendReceipt))
+	// 跨应用原生续接与不可变候选回流/回执增量契约(HUI-1745)。
+	mux.Handle("POST /api/v1/crossapp/continue", s.guard(true, s.handleCrossAppContinue))
+	mux.Handle("POST /api/v1/projects/{id}/outputs/{outputId}/candidate-return", s.guard(true, s.handleCandidateReturn))
+	mux.Handle("POST /api/v1/projects/{id}/outputs/{outputId}/candidate-return/adopt", s.guard(true, s.handleAdoptCandidateReturn))
+	mux.Handle("GET /api/v1/projects/{id}/candidate-returns", s.guard(true, s.handleListCandidateReturns))
+	mux.Handle("GET /api/v1/candidate-returns/{receiptId}", s.guard(true, s.handleGetCandidateReturn))
+	mux.Handle("POST /api/v1/candidate-returns/{receiptId}/retry", s.guard(true, s.handleRetryCandidateReturn))
 
 	mux.Handle("GET /api/v1/billing/balance", s.guard(true, s.handleBillingBalance))
 	mux.Handle("POST /api/v1/billing/consume/quote", s.guard(true, s.handleConsumeQuote))
