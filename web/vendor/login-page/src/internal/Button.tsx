@@ -2,8 +2,6 @@
 
 import type { ReactNode } from "react";
 
-import { Button as ShadcnButton } from "@/components/shadcn/button";
-
 import styles from "./ui.module.css";
 
 export type ButtonVariant = "primary" | "secondary";
@@ -19,7 +17,11 @@ export type ButtonProps = {
   onClick?: () => void;
 };
 
-/** primary=品牌实底、secondary=描边；底层为 shadcn/ui Button，loading 三点脉冲保留。 */
+function cx(...parts: (string | false | undefined)[]): string {
+  return parts.filter(Boolean).join(" ");
+}
+
+/** primary=accent 实底+光晕、secondary=raised+描边；loading 三点脉冲（goboost-fd Button 子集）。 */
 export function Button({
   variant = "secondary",
   block = false,
@@ -30,10 +32,9 @@ export function Button({
   onClick,
 }: ButtonProps) {
   return (
-    <ShadcnButton
+    <button
       type={type}
-      variant={variant === "primary" ? "default" : "outline"}
-      className={block ? "w-full" : undefined}
+      className={cx(styles.btn, styles[variant], block && styles.block)}
       disabled={disabled ?? loading}
       aria-busy={loading || undefined}
       onClick={onClick}
@@ -46,6 +47,6 @@ export function Button({
         </span>
       ) : null}
       <span className={styles.label}>{children}</span>
-    </ShadcnButton>
+    </button>
   );
 }

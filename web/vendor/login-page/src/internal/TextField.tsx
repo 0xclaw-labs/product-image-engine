@@ -2,8 +2,6 @@
 
 import { useState, type ChangeEvent } from "react";
 
-import { Input as ShadcnInput } from "@/components/shadcn/input";
-
 import styles from "./ui.module.css";
 
 export type TextFieldProps = {
@@ -24,7 +22,7 @@ export type TextFieldProps = {
 
 let autoSeq = 0;
 
-/** Field.label + 输入框合体；底层为 shadcn/ui Input，label 配对与错误态契约保留。 */
+/** Field.label + TextInput.input 合体（goboost-fd 两组件的登录页子集）。 */
 export function TextField({
   label,
   value,
@@ -48,7 +46,7 @@ export function TextField({
         {label}
       </label>
       <div className={styles.wrap}>
-        <ShadcnInput
+        <input
           id={inputId}
           type={type}
           value={value}
@@ -58,7 +56,7 @@ export function TextField({
           autoComplete={autoComplete}
           autoFocus={autoFocus}
           disabled={disabled}
-          className={bad ? styles.invalid : undefined}
+          className={[styles.input, bad && styles.invalid].filter(Boolean).join(" ")}
           aria-invalid={bad || undefined}
         />
       </div>

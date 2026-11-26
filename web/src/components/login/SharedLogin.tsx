@@ -39,8 +39,8 @@ export function createBffSignIn(): SignInBridge {
 /**
  * 亮色薄包装。layout="compact"（宿主自持左台主视觉）、密码单式（本应用
  * 没有验证码端点）；brand.name 是统一卡的页题「产品图」；accent 注入本仓
- * 蓝色 token（包缺省 mint 与本仓品牌色不同源）。brand.tagline 不覆写——
- * 包缺省「账号由主管理员开通，不能自助注册。」正是本应用的真实口径。
+ * 蓝色 token（包缺省 mint 与本仓品牌色不同源）。tagline 保留封闭注册真实口径，
+ * 并明确提示使用平台账号邮箱密码登录及重置密码路径；标识输入框标为「邮箱」。
  */
 export function SharedLogin({
   signIn,
@@ -56,6 +56,8 @@ export function SharedLogin({
         modes={{ otp: false, password: true }}
         brand={{
           name: "产品图",
+          tagline:
+            "账号由主管理员开通，不能自助注册。使用平台账号邮箱和密码登录；若尚未设置密码，可前往 modelxing.com 账号中心重置密码。",
           media: null,
           accent: {
             // 实心品牌走 --primary；弱底走 --secondary（= --pn-brand-weak）；
@@ -71,6 +73,7 @@ export function SharedLogin({
         // 落点导航归宿主：onAuthenticated 里 router.replace(safeNext ?? 登录首页)。
         navigate={() => {}}
         messages={{
+          passwordIdentifierLabel: "邮箱",
           generic: (e: unknown) =>
             e instanceof ApiFailure
               ? loginFailureText(e.status, { error: e.code })
