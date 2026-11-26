@@ -57,7 +57,7 @@ export function SharedLogin({
         brand={{
           name: "产品图",
           tagline:
-            "账号由主管理员开通，不能自助注册。使用平台账号邮箱和密码登录；若尚未设置密码，可前往 modelxing.com 账号中心重置密码。",
+            "账号由主管理员开通，不能自助注册。使用平台账号邮箱和密码登录；若尚未设置密码，可前往 auth.modelxing.com 账号中心重置密码。",
           media: null,
           accent: {
             // 实心品牌走 --primary；弱底走 --secondary（= --pn-brand-weak）；

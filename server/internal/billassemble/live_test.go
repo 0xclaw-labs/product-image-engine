@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -229,10 +230,6 @@ func TestLiveSnapshotFiltersEntitlementsByAppStatusAndWindow(t *testing.T) {
 					"status": "active", "valid_from_unix": nowUnix - 100, "valid_until_unix": nowUnix - 1,
 				},
 				map[string]any{
-					"app_id": "product-image", "capability": "cap.expired.boundary",
-					"status": "active", "valid_from_unix": nowUnix - 100, "valid_until_unix": nowUnix,
-				},
-				map[string]any{
 					"app_id": "product-image", "capability": "cap.future",
 					"status": "active", "valid_from_unix": nowUnix + 1, "valid_until_unix": nowUnix + 100,
 				},
@@ -252,7 +249,7 @@ func TestLiveSnapshotFiltersEntitlementsByAppStatusAndWindow(t *testing.T) {
 			want: nil,
 		},
 		{
-			name: "current app active in-window entitlements accepted and deduplicated",
+			name: "current app active in-window entitlements accepted and deduplicated (including == nowUnix boundary)",
 			entitlements: []any{
 				map[string]any{
 					"app_id": "aicut", "capability": "image.generate.premium",
@@ -271,11 +268,15 @@ func TestLiveSnapshotFiltersEntitlementsByAppStatusAndWindow(t *testing.T) {
 					"status": "active", "valid_from_unix": nowUnix, "valid_until_unix": nowUnix + 1,
 				},
 				map[string]any{
-					"app_id": "product-image", "capability": "image.generate.expired",
+					"app_id": "product-image", "capability": "image.generate.boundary_valid",
 					"status": "active", "valid_from_unix": nowUnix - 10, "valid_until_unix": nowUnix,
 				},
+				map[string]any{
+					"app_id": "product-image", "capability": "image.generate.expired",
+					"status": "active", "valid_from_unix": nowUnix - 10, "valid_until_unix": nowUnix - 1,
+				},
 			},
-			want: []string{"image.generate.standard", "image.generate.hd"},
+			want: []string{"image.generate.standard", "image.generate.hd", "image.generate.boundary_valid"},
 		},
 	}
 
@@ -420,10 +421,15 @@ func TestLiveSnapshotAddsActiveScopedCreditsForCurrentAppOnly(t *testing.T) {
 				"app_id": "aicut", "capability": "", "status": "active",
 				"remaining_minor": 999, "reserved_minor": 0, "available_minor": 999, "expires_at_unix": 0,
 			},
-			// 不计入：已过期（边界 == now）
+			// 计入：过期边界 == now 仍有效（与 public-ai 对齐）
 			map[string]any{
 				"app_id": "product-image", "capability": "", "status": "active",
-				"remaining_minor": 400, "reserved_minor": 0, "available_minor": 400, "expires_at_unix": nowUnix,
+				"remaining_minor": 20, "reserved_minor": 0, "available_minor": 20, "expires_at_unix": nowUnix,
+			},
+			// 不计入：已过期（< now）
+			map[string]any{
+				"app_id": "product-image", "capability": "", "status": "active",
+				"remaining_minor": 400, "reserved_minor": 0, "available_minor": 400, "expires_at_unix": nowUnix - 1,
 			},
 			// 不计入：已吊销
 			map[string]any{
@@ -443,13 +449,255 @@ func TestLiveSnapshotAddsActiveScopedCreditsForCurrentAppOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Quote failed: %v", err)
 	}
-	// 50 (cash available) + 60 (app-wide credit) + 70 (standard credit) = 180 >= 150
-	if !quoted.BalanceKnown || quoted.BalanceMinor != 180 || quoted.FundsShort {
-		t.Fatalf("expected BalanceMinor=180 FundsShort=false, got %+v", quoted)
+	// 50 (cash available) + 60 (app-wide credit) + 70 (standard credit) + 20 (expires_at == now) = 200 >= 150
+	if !quoted.BalanceKnown || quoted.BalanceMinor != 200 || quoted.FundsShort {
+		t.Fatalf("expected BalanceMinor=200 FundsShort=false, got %+v", quoted)
 	}
-	// ReadBalance 不限定 capability 时汇总本 app 所有有效活跃 scoped_credits: 50 + 60 + 70 + 500 = 680
+	// ReadBalance 不限定 capability 时汇总本 app 所有有效活跃 scoped_credits: 50 + 60 + 70 + 500 + 20 = 700
 	bal, err := live.ReadBalance(context.Background(), "acct_credit")
-	if err != nil || !bal.Known || bal.Minor != 680 {
-		t.Fatalf("expected ReadBalance=680, got %+v err=%v", bal, err)
+	if err != nil || !bal.Known || bal.Minor != 700 {
+		t.Fatalf("expected ReadBalance=700, got %+v err=%v", bal, err)
 	}
+}
+
+func TestLiveSnapshotFailClosedGuards(t *testing.T) {
+	now := time.Unix(1_760_000_000, 0)
+
+	t.Run("account_id mismatch fails closed", func(t *testing.T) {
+		srv := startSnapshotBillingServer(t, 150, map[string]any{
+			"account": map[string]any{
+				"account_id":           "acct_other",
+				"status":               "active",
+				"cash_available_minor": 1000,
+			},
+			"entitlements": []any{
+				map[string]any{"app_id": "product-image", "capability": "image.generate.standard", "status": "active"},
+			},
+		})
+		live := &Live{AppID: "product-image", BillingToken: "bill-tok", BillingBase: srv.URL, Enabled: true, Now: func() time.Time { return now }}
+		quoted, err := live.Quote(context.Background(), QuoteCall{
+			PayerAccountID: "acct_expected", Capability: "image.generate.standard",
+			Quantity: 1, PricingVersion: PricingVersion, BusinessRef: "proj_1", IdempotencyKey: "fp-acct-mismatch",
+		})
+		if err != nil {
+			t.Fatalf("Quote failed: %v", err)
+		}
+		if quoted.BalanceKnown || quoted.EntitlementsKnown {
+			t.Fatalf("expected fail-closed BalanceKnown=false EntitlementsKnown=false, got %+v", quoted)
+		}
+		bal, err := live.ReadBalance(context.Background(), "acct_expected")
+		if err != nil || bal.Known {
+			t.Fatalf("expected ReadBalance Known=false, got %+v err=%v", bal, err)
+		}
+	})
+
+	t.Run("matching account_id and active status succeed", func(t *testing.T) {
+		srv := startSnapshotBillingServer(t, 150, map[string]any{
+			"account": map[string]any{
+				"account_id":           "acct_ok",
+				"status":               "active",
+				"cash_available_minor": 500,
+			},
+			"entitlements": []any{
+				map[string]any{"app_id": "product-image", "capability": "image.generate.standard", "status": "active"},
+			},
+		})
+		live := &Live{AppID: "product-image", BillingToken: "bill-tok", BillingBase: srv.URL, Enabled: true, Now: func() time.Time { return now }}
+		quoted, err := live.Quote(context.Background(), QuoteCall{
+			PayerAccountID: "acct_ok", Capability: "image.generate.standard",
+			Quantity: 1, PricingVersion: PricingVersion, BusinessRef: "proj_1", IdempotencyKey: "fp-acct-ok",
+		})
+		if err != nil {
+			t.Fatalf("Quote failed: %v", err)
+		}
+		if !quoted.BalanceKnown || quoted.BalanceMinor != 500 || !quoted.EntitlementsKnown || len(quoted.Entitlements) != 1 {
+			t.Fatalf("expected valid snapshot, got %+v", quoted)
+		}
+	})
+
+	t.Run("non-active account status fails closed", func(t *testing.T) {
+		for _, status := range []string{"frozen", "suspended", "closed"} {
+			t.Run(status, func(t *testing.T) {
+				srv := startSnapshotBillingServer(t, 150, map[string]any{
+					"account": map[string]any{
+						"account_id":           "acct_frozen",
+						"status":               status,
+						"cash_available_minor": 1000,
+					},
+					"entitlements": []any{
+						map[string]any{"app_id": "product-image", "capability": "image.generate.standard", "status": "active"},
+					},
+				})
+				live := &Live{AppID: "product-image", BillingToken: "bill-tok", BillingBase: srv.URL, Enabled: true, Now: func() time.Time { return now }}
+				quoted, err := live.Quote(context.Background(), QuoteCall{
+					PayerAccountID: "acct_frozen", Capability: "image.generate.standard",
+					Quantity: 1, PricingVersion: PricingVersion, BusinessRef: "proj_1", IdempotencyKey: "fp-status-" + status,
+				})
+				if err != nil {
+					t.Fatalf("Quote failed: %v", err)
+				}
+				if quoted.BalanceKnown || quoted.EntitlementsKnown {
+					t.Fatalf("status=%q expected fail-closed, got %+v", status, quoted)
+				}
+			})
+		}
+	})
+
+	t.Run("negative cash balance fails closed", func(t *testing.T) {
+		for _, tc := range []struct {
+			name    string
+			account map[string]any
+		}{
+			{
+				name:    "negative cash_available_minor",
+				account: map[string]any{"cash_available_minor": -1, "cash_balance_minor": 100},
+			},
+			{
+				name:    "negative cash_balance_minor fallback",
+				account: map[string]any{"cash_balance_minor": -50},
+			},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				srv := startSnapshotBillingServer(t, 150, map[string]any{
+					"account": tc.account,
+					"entitlements": []any{
+						map[string]any{"app_id": "product-image", "capability": "image.generate.standard", "status": "active"},
+					},
+				})
+				live := &Live{AppID: "product-image", BillingToken: "bill-tok", BillingBase: srv.URL, Enabled: true, Now: func() time.Time { return now }}
+				quoted, err := live.Quote(context.Background(), QuoteCall{
+					PayerAccountID: "acct_neg", Capability: "image.generate.standard",
+					Quantity: 1, PricingVersion: PricingVersion, BusinessRef: "proj_1", IdempotencyKey: "fp-neg-cash",
+				})
+				if err != nil {
+					t.Fatalf("Quote failed: %v", err)
+				}
+				if quoted.BalanceKnown {
+					t.Fatalf("expected BalanceKnown=false for negative cash, got %+v", quoted)
+				}
+				bal, err := live.ReadBalance(context.Background(), "acct_neg")
+				if err != nil || bal.Known {
+					t.Fatalf("expected ReadBalance Known=false, got %+v err=%v", bal, err)
+				}
+			})
+		}
+	})
+
+	t.Run("malformed, negative, or overflowing scoped_credits fail closed", func(t *testing.T) {
+		cases := []struct {
+			name          string
+			cashAvailable int64
+			scopedCredits any
+		}{
+			{
+				name:          "malformed json type",
+				cashAvailable: 500,
+				scopedCredits: "not-an-array",
+			},
+			{
+				name:          "negative available_minor",
+				cashAvailable: 500,
+				scopedCredits: []any{
+					map[string]any{"app_id": "product-image", "status": "active", "available_minor": -10},
+				},
+			},
+			{
+				name:          "negative remaining_minor fallback",
+				cashAvailable: 500,
+				scopedCredits: []any{
+					map[string]any{"app_id": "product-image", "status": "active", "remaining_minor": -5},
+				},
+			},
+			{
+				name:          "scoped credits internal int64 overflow",
+				cashAvailable: 0,
+				scopedCredits: []any{
+					map[string]any{"app_id": "product-image", "status": "active", "available_minor": math.MaxInt64 - 10},
+					map[string]any{"app_id": "product-image", "status": "active", "available_minor": 11},
+				},
+			},
+			{
+				name:          "cash plus scoped credits int64 overflow",
+				cashAvailable: math.MaxInt64 - 5,
+				scopedCredits: []any{
+					map[string]any{"app_id": "product-image", "status": "active", "available_minor": 6},
+				},
+			},
+		}
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				srv := startSnapshotBillingServer(t, 150, map[string]any{
+					"account": map[string]any{
+						"account_id":           "acct_sc",
+						"status":               "active",
+						"cash_available_minor": tc.cashAvailable,
+					},
+					"scoped_credits": tc.scopedCredits,
+					"entitlements": []any{
+						map[string]any{"app_id": "product-image", "capability": "image.generate.standard", "status": "active"},
+					},
+				})
+				live := &Live{AppID: "product-image", BillingToken: "bill-tok", BillingBase: srv.URL, Enabled: true, Now: func() time.Time { return now }}
+				quoted, err := live.Quote(context.Background(), QuoteCall{
+					PayerAccountID: "acct_sc", Capability: "image.generate.standard",
+					Quantity: 1, PricingVersion: PricingVersion, BusinessRef: "proj_1", IdempotencyKey: "fp-sc",
+				})
+				if err != nil {
+					t.Fatalf("Quote failed: %v", err)
+				}
+				if quoted.BalanceKnown {
+					t.Fatalf("%s: expected BalanceKnown=false, got %+v", tc.name, quoted)
+				}
+				bal, err := live.ReadBalance(context.Background(), "acct_sc")
+				if err != nil || bal.Known {
+					t.Fatalf("%s: expected ReadBalance Known=false, got %+v err=%v", tc.name, bal, err)
+				}
+			})
+		}
+	})
+
+	t.Run("entitlements null keeps EntitlementsKnown false while empty array sets true", func(t *testing.T) {
+		srvNull := startSnapshotBillingServer(t, 150, map[string]any{
+			"account": map[string]any{
+				"account_id":           "acct_ent",
+				"status":               "active",
+				"cash_available_minor": 500,
+			},
+			"entitlements": nil,
+		})
+		liveNull := &Live{AppID: "product-image", BillingToken: "bill-tok", BillingBase: srvNull.URL, Enabled: true, Now: func() time.Time { return now }}
+		quotedNull, err := liveNull.Quote(context.Background(), QuoteCall{
+			PayerAccountID: "acct_ent", Capability: "image.generate.standard",
+			Quantity: 1, PricingVersion: PricingVersion, BusinessRef: "proj_1", IdempotencyKey: "fp-ent-null",
+		})
+		if err != nil {
+			t.Fatalf("Quote failed: %v", err)
+		}
+		if !quotedNull.BalanceKnown || quotedNull.BalanceMinor != 500 {
+			t.Fatalf("expected BalanceKnown=true BalanceMinor=500, got %+v", quotedNull)
+		}
+		if quotedNull.EntitlementsKnown || len(quotedNull.Entitlements) != 0 {
+			t.Fatalf("entitlements:null should keep EntitlementsKnown=false, got %+v", quotedNull)
+		}
+
+		srvEmpty := startSnapshotBillingServer(t, 150, map[string]any{
+			"account": map[string]any{
+				"account_id":           "acct_ent",
+				"status":               "active",
+				"cash_available_minor": 500,
+			},
+			"entitlements": []any{},
+		})
+		liveEmpty := &Live{AppID: "product-image", BillingToken: "bill-tok", BillingBase: srvEmpty.URL, Enabled: true, Now: func() time.Time { return now }}
+		quotedEmpty, err := liveEmpty.Quote(context.Background(), QuoteCall{
+			PayerAccountID: "acct_ent", Capability: "image.generate.standard",
+			Quantity: 1, PricingVersion: PricingVersion, BusinessRef: "proj_1", IdempotencyKey: "fp-ent-empty",
+		})
+		if err != nil {
+			t.Fatalf("Quote failed: %v", err)
+		}
+		if !quotedEmpty.EntitlementsKnown || len(quotedEmpty.Entitlements) != 0 {
+			t.Fatalf("entitlements:[] should set EntitlementsKnown=true, got %+v", quotedEmpty)
+		}
+	})
 }

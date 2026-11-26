@@ -62,7 +62,7 @@ describe("登录页(统一组件后的结构契约)", () => {
     const html = render();
     expect(html).toContain("产品图");
     expect(html).toContain("账号由主管理员开通，不能自助注册。");
-    expect(html).toContain("使用平台账号邮箱和密码登录；若尚未设置密码，可前往 modelxing.com 账号中心重置密码。");
+    expect(html).toContain("使用平台账号邮箱和密码登录；若尚未设置密码，可前往 auth.modelxing.com 账号中心重置密码。");
   });
 
   it("产品声音保留:左台主视觉、五步真实流程、不生成图片声明、身份派生声明", () => {

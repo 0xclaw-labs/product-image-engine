@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"math"
 	"net"
 	"net/http"
 	"net/url"
@@ -224,10 +225,21 @@ func (p *Live) attachBalance(ctx context.Context, tenantID, accountID, capabilit
 		return
 	}
 	var account struct {
+		AccountID          string `json:"account_id"`
+		Status             string `json:"status"`
 		CashAvailableMinor *int64 `json:"cash_available_minor"`
 		CashBalanceMinor   *int64 `json:"cash_balance_minor"`
 	}
 	if json.Unmarshal(snap["account"], &account) != nil {
+		return
+	}
+	reqAccountID := strings.TrimSpace(accountID)
+	snapAccountID := strings.TrimSpace(account.AccountID)
+	if reqAccountID != "" && snapAccountID != "" && snapAccountID != reqAccountID {
+		return
+	}
+	snapStatus := strings.TrimSpace(account.Status)
+	if snapStatus != "" && snapStatus != "active" {
 		return
 	}
 	var cashMinor int64
@@ -239,10 +251,16 @@ func (p *Live) attachBalance(ctx context.Context, tenantID, accountID, capabilit
 	default:
 		return
 	}
+	if cashMinor < 0 {
+		return
+	}
 	appID := strings.TrimSpace(p.AppID)
 	targetCapability := strings.TrimSpace(capability)
 	nowUnix := p.now().Unix()
-	scopedMinor := availableScopedCredits(snap["scoped_credits"], appID, targetCapability, nowUnix)
+	scopedMinor, ok := availableScopedCredits(snap["scoped_credits"], appID, targetCapability, nowUnix)
+	if !ok || scopedMinor > math.MaxInt64-cashMinor {
+		return
+	}
 
 	fact.BalanceKnown = true
 	fact.BalanceMinor = cashMinor + scopedMinor
@@ -253,6 +271,10 @@ func (p *Live) attachBalance(ctx context.Context, tenantID, accountID, capabilit
 	if !ok {
 		return
 	}
+	trimmedEnt := bytes.TrimSpace(raw)
+	if len(trimmedEnt) == 0 || bytes.Equal(trimmedEnt, []byte("null")) {
+		return
+	}
 	var rows []struct {
 		AppID          string `json:"app_id"`
 		Capability     string `json:"capability"`
@@ -260,7 +282,7 @@ func (p *Live) attachBalance(ctx context.Context, tenantID, accountID, capabilit
 		ValidFromUnix  int64  `json:"valid_from_unix"`
 		ValidUntilUnix int64  `json:"valid_until_unix"`
 	}
-	if json.Unmarshal(raw, &rows) != nil {
+	if json.Unmarshal(trimmedEnt, &rows) != nil {
 		return
 	}
 	fact.EntitlementsKnown = true
@@ -279,7 +301,7 @@ func (p *Live) attachBalance(ctx context.Context, tenantID, accountID, capabilit
 		if row.ValidFromUnix > nowUnix {
 			continue
 		}
-		if row.ValidUntilUnix < 0 || (row.ValidUntilUnix != 0 && row.ValidUntilUnix <= nowUnix) {
+		if row.ValidUntilUnix < 0 || (row.ValidUntilUnix != 0 && row.ValidUntilUnix < nowUnix) {
 			continue
 		}
 		if _, dup := seen[capName]; dup {
@@ -290,10 +312,10 @@ func (p *Live) attachBalance(ctx context.Context, tenantID, accountID, capabilit
 	}
 }
 
-func availableScopedCredits(raw json.RawMessage, appID, targetCapability string, nowUnix int64) int64 {
+func availableScopedCredits(raw json.RawMessage, appID, targetCapability string, nowUnix int64) (int64, bool) {
 	trimmed := bytes.TrimSpace(raw)
 	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) {
-		return 0
+		return 0, true
 	}
 	var rows []struct {
 		AppID          string `json:"app_id"`
@@ -304,7 +326,7 @@ func availableScopedCredits(raw json.RawMessage, appID, targetCapability string,
 		ExpiresAtUnix  int64  `json:"expires_at_unix"`
 	}
 	if json.Unmarshal(trimmed, &rows) != nil {
-		return 0
+		return 0, false
 	}
 	var total int64
 	for _, row := range rows {
@@ -314,7 +336,7 @@ func availableScopedCredits(raw json.RawMessage, appID, targetCapability string,
 		if strings.TrimSpace(row.Status) != "active" {
 			continue
 		}
-		if row.ExpiresAtUnix < 0 || (row.ExpiresAtUnix != 0 && row.ExpiresAtUnix <= nowUnix) {
+		if row.ExpiresAtUnix < 0 || (row.ExpiresAtUnix != 0 && row.ExpiresAtUnix < nowUnix) {
 			continue
 		}
 		creditCap := strings.TrimSpace(row.Capability)
@@ -330,11 +352,15 @@ func availableScopedCredits(raw json.RawMessage, appID, targetCapability string,
 		default:
 			continue
 		}
-		if minor > 0 {
-			total += minor
+		if minor < 0 {
+			return 0, false
 		}
+		if minor > math.MaxInt64-total {
+			return 0, false
+		}
+		total += minor
 	}
-	return total
+	return total, true
 }
 
 func (p *Live) now() time.Time {
