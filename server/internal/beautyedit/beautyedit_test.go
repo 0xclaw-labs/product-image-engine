@@ -811,7 +811,7 @@ func TestNonTargetFaceAndMakeupDriftRejectedWithRealPNGPixels(t *testing.T) {
 	)
 	// Candidate replaced background BUT ALSO altered real makeup and face skin!
 	driftedPNG := makePortraitPNG(
-		color.NRGBA{R: 40, G: 60, B: 110, A: 255},  // bg changed
+		color.NRGBA{R: 40, G: 60, B: 110, A: 255},   // bg changed
 		color.NRGBA{R: 190, G: 140, B: 120, A: 255}, // skin altered!
 		color.NRGBA{R: 20, G: 210, B: 220, A: 255},  // real makeup altered drastically!
 	)
@@ -1266,10 +1266,10 @@ func TestConcurrentStressUnderRace(t *testing.T) {
 	// Phase A: 24 concurrent duplicate command_id submissions -> EXACTLY 1 provider call & 1 billing charge!
 	const dupWorkers = 24
 	var (
-		wg            sync.WaitGroup
-		freshCount    atomic.Int64
-		replayCount   atomic.Int64
-		errCount      atomic.Int64
+		wg          sync.WaitGroup
+		freshCount  atomic.Int64
+		replayCount atomic.Int64
+		errCount    atomic.Int64
 	)
 	dupReq := SubmitEditRequest{
 		CommandID:            "cmd-race-cand-1",

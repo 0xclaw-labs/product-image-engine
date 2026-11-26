@@ -28,41 +28,41 @@ const (
 	DefaultMaxNonTargetPixelDrift       = 0.05
 	DefaultMinTargetChangedRatio        = 0.08
 
-	maskAlphaThreshold      = 128
-	minTargetPixelDelta     = 8
+	maskAlphaThreshold  = 128
+	minTargetPixelDelta = 8
 )
 
 // Machine-readable failure reasons for EvaluateBeautyEditGate.
 const (
-	ReasonInvalidAppID                     = "invalid_app_id"
-	ReasonMissingPrincipalID               = "missing_principal_id"
-	ReasonInvalidGateThresholds            = "invalid_beauty_gate_thresholds"
-	ReasonFakeSampleRejected               = "fake_or_synthetic_sample_rejected"
-	ReasonUnverifiedEditMode               = "edit_mode_not_verified"
-	ReasonDishonestPixelLockClaim          = "full_redraw_claimed_pixel_locked_local_edit"
-	ReasonFullRedrawMissingPostEditVerify  = "full_redraw_missing_post_edit_region_verification"
-	ReasonMissingOrInvalidSHA256           = "missing_or_invalid_source_or_candidate_sha256"
-	ReasonMissingEvaluatorOrThresholdVer   = "missing_or_mismatched_evaluator_or_threshold_version"
-	ReasonEchoCopyDetected                 = "echo_copy_no_target_edit_detected"
-	ReasonSimilarityOnlyRejected           = "similarity_percentage_only_certification_rejected"
-	ReasonIdentityCheckMissing             = "identity_feature_check_not_evaluated"
-	ReasonFaceIdentityDriftExceeded        = "face_identity_score_below_threshold"
-	ReasonFacialGeometryDriftExceeded      = "facial_geometry_drift_exceeded"
-	ReasonRegionInvarianceCheckMissing     = "non_target_region_invariance_not_evaluated"
-	ReasonSkinTextureDriftExceeded         = "skin_texture_drift_exceeded"
-	ReasonUnapprovedRealMakeupAlteration   = "unapproved_real_makeup_alteration"
-	ReasonNonTargetPixelDriftExceeded      = "non_target_region_pixel_drift_exceeded"
-	ReasonUnapprovedRegionAltered          = "unapproved_preserved_region_altered"
-	ReasonTargetRegionNotModified          = "target_region_change_below_threshold"
-	ReasonScopeMatchCheckMissing           = "declared_edit_scope_match_not_evaluated"
-	ReasonDeclaredRegionContractInvalid    = "declared_region_contract_invalid"
-	ReasonObservedEditOutsideAllowedScope  = "observed_modified_region_outside_allowed_scope"
-	ReasonObservedEditHitPreservedRegion   = "observed_modified_region_hit_preserved_region"
-	ReasonUsageDisclosureCheckMissing      = "usage_disclosure_check_not_evaluated"
-	ReasonCreativeClaimedAsRealProof       = "creative_makeup_demo_claimed_as_real_service_proof"
-	ReasonCreativeDisclosureMissing        = "creative_makeup_demo_missing_disclosure_label"
-	ReasonUsageTypeModeMismatch            = "usage_type_does_not_match_edit_mode"
-	ReasonInvalidMetricValue               = "invalid_or_non_finite_metric_value"
+	ReasonInvalidAppID                    = "invalid_app_id"
+	ReasonMissingPrincipalID              = "missing_principal_id"
+	ReasonInvalidGateThresholds           = "invalid_beauty_gate_thresholds"
+	ReasonFakeSampleRejected              = "fake_or_synthetic_sample_rejected"
+	ReasonUnverifiedEditMode              = "edit_mode_not_verified"
+	ReasonDishonestPixelLockClaim         = "full_redraw_claimed_pixel_locked_local_edit"
+	ReasonFullRedrawMissingPostEditVerify = "full_redraw_missing_post_edit_region_verification"
+	ReasonMissingOrInvalidSHA256          = "missing_or_invalid_source_or_candidate_sha256"
+	ReasonMissingEvaluatorOrThresholdVer  = "missing_or_mismatched_evaluator_or_threshold_version"
+	ReasonEchoCopyDetected                = "echo_copy_no_target_edit_detected"
+	ReasonSimilarityOnlyRejected          = "similarity_percentage_only_certification_rejected"
+	ReasonIdentityCheckMissing            = "identity_feature_check_not_evaluated"
+	ReasonFaceIdentityDriftExceeded       = "face_identity_score_below_threshold"
+	ReasonFacialGeometryDriftExceeded     = "facial_geometry_drift_exceeded"
+	ReasonRegionInvarianceCheckMissing    = "non_target_region_invariance_not_evaluated"
+	ReasonSkinTextureDriftExceeded        = "skin_texture_drift_exceeded"
+	ReasonUnapprovedRealMakeupAlteration  = "unapproved_real_makeup_alteration"
+	ReasonNonTargetPixelDriftExceeded     = "non_target_region_pixel_drift_exceeded"
+	ReasonUnapprovedRegionAltered         = "unapproved_preserved_region_altered"
+	ReasonTargetRegionNotModified         = "target_region_change_below_threshold"
+	ReasonScopeMatchCheckMissing          = "declared_edit_scope_match_not_evaluated"
+	ReasonDeclaredRegionContractInvalid   = "declared_region_contract_invalid"
+	ReasonObservedEditOutsideAllowedScope = "observed_modified_region_outside_allowed_scope"
+	ReasonObservedEditHitPreservedRegion  = "observed_modified_region_hit_preserved_region"
+	ReasonUsageDisclosureCheckMissing     = "usage_disclosure_check_not_evaluated"
+	ReasonCreativeClaimedAsRealProof      = "creative_makeup_demo_claimed_as_real_service_proof"
+	ReasonCreativeDisclosureMissing       = "creative_makeup_demo_missing_disclosure_label"
+	ReasonUsageTypeModeMismatch           = "usage_type_does_not_match_edit_mode"
+	ReasonInvalidMetricValue              = "invalid_or_non_finite_metric_value"
 )
 
 var (
@@ -80,29 +80,29 @@ var (
 // BeautyEditThresholds configures deterministic fail-closed thresholds for
 // beauty-portrait restricted editing QA. Zero-value fails closed.
 type BeautyEditThresholds struct {
-	ThresholdVersion            string  `json:"threshold_version"`
+	ThresholdVersion             string  `json:"threshold_version"`
 	MinFaceIdentityScoreFidelity float64 `json:"min_face_identity_score_fidelity"`
 	MinFaceIdentityScoreCreative float64 `json:"min_face_identity_score_creative"`
-	MaxFacialGeometryDrift      float64 `json:"max_facial_geometry_drift"`
-	MaxSkinTextureDrift         float64 `json:"max_skin_texture_drift"`
-	MaxRealMakeupDrift          float64 `json:"max_real_makeup_drift"`
-	MaxNonTargetPixelDrift      float64 `json:"max_non_target_pixel_drift"`
-	MinTargetChangedRatio       float64 `json:"min_target_changed_ratio"`
-	DisallowSameHash            bool    `json:"disallow_same_hash"`
+	MaxFacialGeometryDrift       float64 `json:"max_facial_geometry_drift"`
+	MaxSkinTextureDrift          float64 `json:"max_skin_texture_drift"`
+	MaxRealMakeupDrift           float64 `json:"max_real_makeup_drift"`
+	MaxNonTargetPixelDrift       float64 `json:"max_non_target_pixel_drift"`
+	MinTargetChangedRatio        float64 `json:"min_target_changed_ratio"`
+	DisallowSameHash             bool    `json:"disallow_same_hash"`
 }
 
 // DefaultBeautyEditThresholds returns strict baseline thresholds for HUI-3902.
 func DefaultBeautyEditThresholds() BeautyEditThresholds {
 	return BeautyEditThresholds{
-		ThresholdVersion:            DefaultBeautyThresholdVersion,
+		ThresholdVersion:             DefaultBeautyThresholdVersion,
 		MinFaceIdentityScoreFidelity: DefaultMinFaceIdentityScoreFidelity,
 		MinFaceIdentityScoreCreative: DefaultMinFaceIdentityScoreCreative,
-		MaxFacialGeometryDrift:      DefaultMaxFacialGeometryDrift,
-		MaxSkinTextureDrift:         DefaultMaxSkinTextureDrift,
-		MaxRealMakeupDrift:          DefaultMaxRealMakeupDrift,
-		MaxNonTargetPixelDrift:      DefaultMaxNonTargetPixelDrift,
-		MinTargetChangedRatio:       DefaultMinTargetChangedRatio,
-		DisallowSameHash:            true,
+		MaxFacialGeometryDrift:       DefaultMaxFacialGeometryDrift,
+		MaxSkinTextureDrift:          DefaultMaxSkinTextureDrift,
+		MaxRealMakeupDrift:           DefaultMaxRealMakeupDrift,
+		MaxNonTargetPixelDrift:       DefaultMaxNonTargetPixelDrift,
+		MinTargetChangedRatio:        DefaultMinTargetChangedRatio,
+		DisallowSameHash:             true,
 	}
 }
 

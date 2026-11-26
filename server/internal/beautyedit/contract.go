@@ -59,16 +59,16 @@ const (
 type RegionKind string
 
 const (
-	RegionFaceIdentity  RegionKind = "face_identity"
-	RegionSkinTexture   RegionKind = "skin_texture"
-	RegionRealMakeup    RegionKind = "real_makeup"
-	RegionHairClothing  RegionKind = "hair_clothing"
-	RegionBackground    RegionKind = "background"
-	RegionComposition   RegionKind = "composition_framing"
-	RegionMakeupRegion  RegionKind = "makeup_region"
-	RegionEyeMakeup     RegionKind = "eye_makeup"
-	RegionLipMakeup     RegionKind = "lip_makeup"
-	RegionBlushContour  RegionKind = "blush_contour"
+	RegionFaceIdentity RegionKind = "face_identity"
+	RegionSkinTexture  RegionKind = "skin_texture"
+	RegionRealMakeup   RegionKind = "real_makeup"
+	RegionHairClothing RegionKind = "hair_clothing"
+	RegionBackground   RegionKind = "background"
+	RegionComposition  RegionKind = "composition_framing"
+	RegionMakeupRegion RegionKind = "makeup_region"
+	RegionEyeMakeup    RegionKind = "eye_makeup"
+	RegionLipMakeup    RegionKind = "lip_makeup"
+	RegionBlushContour RegionKind = "blush_contour"
 )
 
 // AdapterEditCapability honestly declares how an underlying image-edit adapter
