@@ -700,4 +700,49 @@ func TestLiveSnapshotFailClosedGuards(t *testing.T) {
 			t.Fatalf("entitlements:[] should set EntitlementsKnown=true, got %+v", quotedEmpty)
 		}
 	})
+
+	t.Run("snapshot ok:false fails closed", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"ok": false,
+				"snapshot": map[string]any{
+					"account": map[string]any{
+						"account_id":           "acct_fail",
+						"status":               "active",
+						"cash_available_minor": 999,
+					},
+				},
+			})
+		}))
+		defer srv.Close()
+		live := &Live{AppID: "product-image", BillingToken: "bill-tok", BillingBase: srv.URL, Enabled: true, Now: func() time.Time { return now }}
+		bal, err := live.ReadBalanceForCapability(context.Background(), "tnt_1", "acct_fail", "image.generate.standard")
+		if err != nil || bal.Known {
+			t.Fatalf("ok:false must fail closed, got %+v err=%v", bal, err)
+		}
+	})
+
+	t.Run("ReadBalanceForCapability excludes foreign capability scoped credits", func(t *testing.T) {
+		srv := startSnapshotBillingServer(t, 150, map[string]any{
+			"account": map[string]any{
+				"account_id":           "acct_cap",
+				"status":               "active",
+				"cash_available_minor": 100,
+			},
+			"scoped_credits": []any{
+				map[string]any{"app_id": "product-image", "capability": "image.generate.standard", "status": "active", "available_minor": 50},
+				map[string]any{"app_id": "product-image", "capability": "image.generate.hd", "status": "active", "available_minor": 500},
+				map[string]any{"app_id": "product-image", "capability": "", "status": "active", "available_minor": 25},
+			},
+		})
+		live := &Live{AppID: "product-image", BillingToken: "bill-tok", BillingBase: srv.URL, Enabled: true, Now: func() time.Time { return now }}
+		bal, err := live.ReadBalanceForCapability(context.Background(), "tnt_1", "acct_cap", "image.generate.standard")
+		if err != nil {
+			t.Fatalf("ReadBalanceForCapability failed: %v", err)
+		}
+		if !bal.Known || bal.Minor != 175 {
+			t.Fatalf("expected 100+50+25=175, got %+v", bal)
+		}
+	})
 }

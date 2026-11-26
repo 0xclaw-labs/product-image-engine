@@ -120,7 +120,7 @@ func (s *Server) handleConsumeConfirm(w http.ResponseWriter, r *http.Request) {
 		s.writeQuoteErr(w, payer, fact, err)
 		return
 	}
-	s.refreshBalance(r.Context(), proj.TenantID, payer, &q)
+	s.refreshBalance(r.Context(), proj.TenantID, payer, fact.Capability, &q)
 	if err := s.allowCapability(fact.Capability, q); err != nil {
 		writeErr(w, http.StatusConflict, "entitlement_missing", "有现金也不表示已开通该能力")
 		return
@@ -375,9 +375,22 @@ type tenantBalanceReader interface {
 	ReadBalanceFor(ctx context.Context, tenantID, accountID string) (billassemble.Balance, error)
 }
 
+type tenantCapabilityBalanceReader interface {
+	ReadBalanceForCapability(ctx context.Context, tenantID, accountID, capability string) (billassemble.Balance, error)
+}
+
 func (s *Server) readPayerBalance(ctx context.Context, tenantID, accountID string) (billassemble.Balance, error) {
+	return s.readPayerBalanceForCapability(ctx, tenantID, accountID, "")
+}
+
+func (s *Server) readPayerBalanceForCapability(ctx context.Context, tenantID, accountID, capability string) (billassemble.Balance, error) {
 	if s.Bills == nil {
 		return billassemble.Balance{Connection: billassemble.ConnMissing}, billassemble.ErrConfigMissing
+	}
+	if strings.TrimSpace(capability) != "" {
+		if reader, ok := s.Bills.(tenantCapabilityBalanceReader); ok {
+			return reader.ReadBalanceForCapability(ctx, tenantID, accountID, capability)
+		}
 	}
 	if reader, ok := s.Bills.(tenantBalanceReader); ok {
 		return reader.ReadBalanceFor(ctx, tenantID, accountID)
@@ -385,11 +398,11 @@ func (s *Server) readPayerBalance(ctx context.Context, tenantID, accountID strin
 	return s.Bills.ReadBalance(ctx, accountID)
 }
 
-func (s *Server) refreshBalance(ctx context.Context, tenantID string, payer billconsume.Payer, q *billassemble.QuoteFact) {
+func (s *Server) refreshBalance(ctx context.Context, tenantID string, payer billconsume.Payer, capability string, q *billassemble.QuoteFact) {
 	if s.Bills == nil || q.IncludedAllowance {
 		return
 	}
-	bal, err := s.readPayerBalance(ctx, tenantID, payer.AccountRef)
+	bal, err := s.readPayerBalanceForCapability(ctx, tenantID, payer.AccountRef, capability)
 	if err != nil {
 		q.BalanceKnown = false
 		q.FundsShort = false

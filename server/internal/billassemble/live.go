@@ -123,11 +123,16 @@ func (p *Live) ReadBalance(ctx context.Context, accountID string) (Balance, erro
 
 // ReadBalanceFor 只读指定租户名下的账号。租户不匹配时余额未知，不返回别的租户的数字。
 func (p *Live) ReadBalanceFor(ctx context.Context, tenantID, accountID string) (Balance, error) {
+	return p.ReadBalanceForCapability(ctx, tenantID, accountID, "")
+}
+
+// ReadBalanceForCapability 读取指定租户、账号在特定能力下可用的现金 + 定向额度余额。
+func (p *Live) ReadBalanceForCapability(ctx context.Context, tenantID, accountID, capability string) (Balance, error) {
 	if err := p.billingReady(); err != nil {
 		return Balance{Connection: ConnMissing}, err
 	}
 	var fact QuoteFact
-	p.attachBalance(ctx, tenantID, accountID, "", &fact)
+	p.attachBalance(ctx, tenantID, accountID, capability, &fact)
 	if !fact.BalanceKnown {
 		return Balance{Known: false, Connection: ConnReady}, nil
 	}
@@ -218,6 +223,10 @@ func (p *Live) attachBalance(ctx context.Context, tenantID, accountID, capabilit
 	}
 	var root map[string]json.RawMessage
 	if json.Unmarshal(body, &root) != nil {
+		return
+	}
+	var okFlag bool
+	if json.Unmarshal(root["ok"], &okFlag) != nil || !okFlag {
 		return
 	}
 	var snap map[string]json.RawMessage
