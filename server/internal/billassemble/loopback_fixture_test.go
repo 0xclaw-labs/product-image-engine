@@ -320,8 +320,8 @@ func (f *tenantFixture) serveBalance(w http.ResponseWriter, r *http.Request, acc
 		return
 	}
 	writeFixture(w, http.StatusOK, map[string]any{"ok": true, "snapshot": map[string]any{
-		"account":      map[string]any{"cash_balance_minor": box.cash},
-		"entitlements": []any{map[string]any{"capability": box.capability, "status": "active"}},
+		"account":      map[string]any{"cash_balance_minor": box.cash, "cash_reserved_minor": 0, "cash_available_minor": box.cash},
+		"entitlements": []any{map[string]any{"app_id": "product-image", "capability": box.capability, "status": "active"}},
 	}})
 }
 

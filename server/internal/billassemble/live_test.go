@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestLiveQuoteDoesNotHoldOrCharge(t *testing.T) {
@@ -170,5 +171,285 @@ func TestLiveLookupFeeRefIsNotASettlement(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func startSnapshotBillingServer(t *testing.T, amountMinor int64, snapshot map[string]any) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/internal/v1/billing/unified/usage":
+			_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "fact": map[string]any{"usage_id": "usg_snap"}})
+		case "/internal/v1/billing/unified/quote":
+			_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "quote": map[string]any{
+				"usage_id": "usg_snap", "amount_minor": amountMinor, "quantity": 1, "pricing_version": PricingVersion,
+			}})
+		case "/internal/v1/billing/unified/accounts":
+			_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "snapshot": snapshot})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func TestLiveSnapshotFiltersEntitlementsByAppStatusAndWindow(t *testing.T) {
+	now := time.Unix(1_760_000_000, 0)
+	nowUnix := now.Unix()
+
+	tests := []struct {
+		name         string
+		entitlements []any
+		want         []string
+	}{
+		{
+			name: "other app active entitlement rejected",
+			entitlements: []any{
+				map[string]any{
+					"app_id": "aicut", "capability": "image.generate.standard",
+					"status": "active", "valid_from_unix": 0, "valid_until_unix": 0,
+				},
+				map[string]any{
+					"app_id": "goboost", "capability": "image.generate.premium",
+					"status": "active", "valid_from_unix": nowUnix - 100, "valid_until_unix": nowUnix + 100,
+				},
+				map[string]any{
+					"capability": "image.generate.standard",
+					"status":     "active",
+				},
+			},
+			want: nil,
+		},
+		{
+			name: "expired and not-yet-valid and non-active entitlements rejected",
+			entitlements: []any{
+				map[string]any{
+					"app_id": "product-image", "capability": "cap.expired.past",
+					"status": "active", "valid_from_unix": nowUnix - 100, "valid_until_unix": nowUnix - 1,
+				},
+				map[string]any{
+					"app_id": "product-image", "capability": "cap.expired.boundary",
+					"status": "active", "valid_from_unix": nowUnix - 100, "valid_until_unix": nowUnix,
+				},
+				map[string]any{
+					"app_id": "product-image", "capability": "cap.future",
+					"status": "active", "valid_from_unix": nowUnix + 1, "valid_until_unix": nowUnix + 100,
+				},
+				map[string]any{
+					"app_id": "product-image", "capability": "cap.revoked",
+					"status": "revoked", "valid_from_unix": 0, "valid_until_unix": 0,
+				},
+				map[string]any{
+					"app_id": "product-image", "capability": "cap.empty.status",
+					"status": "", "valid_from_unix": 0, "valid_until_unix": 0,
+				},
+				map[string]any{
+					"app_id": "product-image", "capability": "cap.negative.until",
+					"status": "active", "valid_from_unix": 0, "valid_until_unix": -1,
+				},
+			},
+			want: nil,
+		},
+		{
+			name: "current app active in-window entitlements accepted and deduplicated",
+			entitlements: []any{
+				map[string]any{
+					"app_id": "aicut", "capability": "image.generate.premium",
+					"status": "active", "valid_from_unix": 0, "valid_until_unix": 0,
+				},
+				map[string]any{
+					"app_id": "product-image", "capability": "image.generate.standard",
+					"status": "active", "valid_from_unix": 0, "valid_until_unix": 0,
+				},
+				map[string]any{
+					"app_id": "product-image", "capability": "image.generate.standard",
+					"status": "active", "valid_from_unix": nowUnix - 10, "valid_until_unix": nowUnix + 10,
+				},
+				map[string]any{
+					"app_id": "product-image", "capability": "image.generate.hd",
+					"status": "active", "valid_from_unix": nowUnix, "valid_until_unix": nowUnix + 1,
+				},
+				map[string]any{
+					"app_id": "product-image", "capability": "image.generate.expired",
+					"status": "active", "valid_from_unix": nowUnix - 10, "valid_until_unix": nowUnix,
+				},
+			},
+			want: []string{"image.generate.standard", "image.generate.hd"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := startSnapshotBillingServer(t, 150, map[string]any{
+				"account": map[string]any{
+					"cash_balance_minor":   1000,
+					"cash_reserved_minor":  0,
+					"cash_available_minor": 1000,
+				},
+				"entitlements": tc.entitlements,
+			})
+			live := &Live{
+				AppID: "product-image", BillingToken: "bill-tok", BillingBase: srv.URL,
+				Enabled: true, Now: func() time.Time { return now },
+			}
+			quoted, err := live.Quote(context.Background(), QuoteCall{
+				PayerAccountID: "acct_person", Capability: "image.generate.standard",
+				Quantity: 1, PricingVersion: PricingVersion, BusinessRef: "proj_1", IdempotencyKey: "fp-ent",
+			})
+			if err != nil {
+				t.Fatalf("Quote failed: %v", err)
+			}
+			if !quoted.EntitlementsKnown {
+				t.Fatalf("expected EntitlementsKnown=true")
+			}
+			if len(quoted.Entitlements) != len(tc.want) {
+				t.Fatalf("entitlements mismatch: got %v, want %v", quoted.Entitlements, tc.want)
+			}
+			for i := range tc.want {
+				if quoted.Entitlements[i] != tc.want[i] {
+					t.Fatalf("entitlement[%d]: got %q, want %q (all=%v)", i, quoted.Entitlements[i], tc.want[i], quoted.Entitlements)
+				}
+			}
+		})
+	}
+}
+
+func TestLiveSnapshotUsesCashAvailableMinorUnderInFlightHold(t *testing.T) {
+	now := time.Unix(1_760_000_000, 0)
+
+	t.Run("partial hold makes available balance insufficient", func(t *testing.T) {
+		srv := startSnapshotBillingServer(t, 150, map[string]any{
+			"account": map[string]any{
+				"cash_balance_minor":   1000,
+				"cash_reserved_minor":  900,
+				"cash_available_minor": 100,
+			},
+			"entitlements": []any{
+				map[string]any{"app_id": "product-image", "capability": "image.generate.standard", "status": "active"},
+			},
+		})
+		live := &Live{
+			AppID: "product-image", BillingToken: "bill-tok", BillingBase: srv.URL,
+			Enabled: true, Now: func() time.Time { return now },
+		}
+		quoted, err := live.Quote(context.Background(), QuoteCall{
+			PayerAccountID: "acct_hold", Capability: "image.generate.standard",
+			Quantity: 1, PricingVersion: PricingVersion, BusinessRef: "proj_1", IdempotencyKey: "fp-hold-1",
+		})
+		if err != nil {
+			t.Fatalf("Quote failed: %v", err)
+		}
+		if !quoted.BalanceKnown || quoted.BalanceMinor != 100 || !quoted.FundsShort {
+			t.Fatalf("expected BalanceMinor=100 FundsShort=true, got %+v", quoted)
+		}
+		bal, err := live.ReadBalance(context.Background(), "acct_hold")
+		if err != nil || !bal.Known || bal.Minor != 100 {
+			t.Fatalf("ReadBalance should use cash_available_minor=100, got %+v err=%v", bal, err)
+		}
+	})
+
+	t.Run("full hold zero available does not fall back to cash_balance_minor", func(t *testing.T) {
+		srv := startSnapshotBillingServer(t, 150, map[string]any{
+			"account": map[string]any{
+				"cash_balance_minor":   1000,
+				"cash_reserved_minor":  1000,
+				"cash_available_minor": 0,
+			},
+			"entitlements": []any{
+				map[string]any{"app_id": "product-image", "capability": "image.generate.standard", "status": "active"},
+			},
+		})
+		live := &Live{
+			AppID: "product-image", BillingToken: "bill-tok", BillingBase: srv.URL,
+			Enabled: true, Now: func() time.Time { return now },
+		}
+		quoted, err := live.Quote(context.Background(), QuoteCall{
+			PayerAccountID: "acct_zero", Capability: "image.generate.standard",
+			Quantity: 1, PricingVersion: PricingVersion, BusinessRef: "proj_1", IdempotencyKey: "fp-hold-0",
+		})
+		if err != nil {
+			t.Fatalf("Quote failed: %v", err)
+		}
+		if !quoted.BalanceKnown || quoted.BalanceMinor != 0 || !quoted.FundsShort {
+			t.Fatalf("expected BalanceMinor=0 FundsShort=true, got %+v", quoted)
+		}
+		bal, err := live.ReadBalance(context.Background(), "acct_zero")
+		if err != nil || !bal.Known || bal.Minor != 0 {
+			t.Fatalf("ReadBalance should return 0 when fully held, got %+v err=%v", bal, err)
+		}
+	})
+}
+
+func TestLiveSnapshotAddsActiveScopedCreditsForCurrentAppOnly(t *testing.T) {
+	now := time.Unix(1_760_000_000, 0)
+	nowUnix := now.Unix()
+
+	srv := startSnapshotBillingServer(t, 150, map[string]any{
+		"account": map[string]any{
+			"cash_balance_minor":   500,
+			"cash_reserved_minor":  450,
+			"cash_available_minor": 50,
+		},
+		"entitlements": []any{
+			map[string]any{"app_id": "product-image", "capability": "image.generate.standard", "status": "active"},
+		},
+		"scoped_credits": []any{
+			// 计入：本 app 通用、active、永不过期，优先 available_minor=60（忽略 remaining_minor=100）
+			map[string]any{
+				"app_id": "product-image", "capability": "", "status": "active",
+				"remaining_minor": 100, "reserved_minor": 40, "available_minor": 60, "expires_at_unix": 0,
+			},
+			// 计入：本 app 匹配能力、active、未过期
+			map[string]any{
+				"app_id": "product-image", "capability": "image.generate.standard", "status": "active",
+				"remaining_minor": 70, "reserved_minor": 0, "available_minor": 70, "expires_at_unix": nowUnix + 60,
+			},
+			// 不计入：本 app 另一能力，Quote standard 时不能用
+			map[string]any{
+				"app_id": "product-image", "capability": "image.generate.premium", "status": "active",
+				"remaining_minor": 500, "reserved_minor": 0, "available_minor": 500, "expires_at_unix": 0,
+			},
+			// 不计入：本 app 全额冻结（available_minor=0，不能回退 remaining_minor）
+			map[string]any{
+				"app_id": "product-image", "capability": "", "status": "active",
+				"remaining_minor": 300, "reserved_minor": 300, "available_minor": 0, "expires_at_unix": 0,
+			},
+			// 不计入：其他 app
+			map[string]any{
+				"app_id": "aicut", "capability": "", "status": "active",
+				"remaining_minor": 999, "reserved_minor": 0, "available_minor": 999, "expires_at_unix": 0,
+			},
+			// 不计入：已过期（边界 == now）
+			map[string]any{
+				"app_id": "product-image", "capability": "", "status": "active",
+				"remaining_minor": 400, "reserved_minor": 0, "available_minor": 400, "expires_at_unix": nowUnix,
+			},
+			// 不计入：已吊销
+			map[string]any{
+				"app_id": "product-image", "capability": "", "status": "revoked",
+				"remaining_minor": 400, "reserved_minor": 0, "available_minor": 400, "expires_at_unix": 0,
+			},
+		},
+	})
+	live := &Live{
+		AppID: "product-image", BillingToken: "bill-tok", BillingBase: srv.URL,
+		Enabled: true, Now: func() time.Time { return now },
+	}
+	quoted, err := live.Quote(context.Background(), QuoteCall{
+		PayerAccountID: "acct_credit", Capability: "image.generate.standard",
+		Quantity: 1, PricingVersion: PricingVersion, BusinessRef: "proj_1", IdempotencyKey: "fp-credit",
+	})
+	if err != nil {
+		t.Fatalf("Quote failed: %v", err)
+	}
+	// 50 (cash available) + 60 (app-wide credit) + 70 (standard credit) = 180 >= 150
+	if !quoted.BalanceKnown || quoted.BalanceMinor != 180 || quoted.FundsShort {
+		t.Fatalf("expected BalanceMinor=180 FundsShort=false, got %+v", quoted)
+	}
+	// ReadBalance 不限定 capability 时汇总本 app 所有有效活跃 scoped_credits: 50 + 60 + 70 + 500 = 680
+	bal, err := live.ReadBalance(context.Background(), "acct_credit")
+	if err != nil || !bal.Known || bal.Minor != 680 {
+		t.Fatalf("expected ReadBalance=680, got %+v err=%v", bal, err)
 	}
 }
