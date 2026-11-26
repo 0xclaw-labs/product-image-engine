@@ -233,8 +233,10 @@ func (s *Server) Router() http.Handler {
 	// 没有真实视频供应商时结果是失败或待确认,不播放静图或假视频,不把计费或生产授权标成通过。
 	if s.Cfg.ShowcaseVideoEnabled {
 		mux.Handle("GET /api/v1/showcase-videos/capabilities", s.guard(true, s.handleShowcaseVideoCapabilities))
+		mux.Handle("POST /api/v1/showcase-videos/qualify", s.guard(true, s.handleQualifyShowcaseVideo))
 		mux.Handle("POST /api/v1/projects/{id}/showcase-videos", s.guard(true, s.handleCreateShowcaseVideo))
 		mux.Handle("GET /api/v1/projects/{id}/showcase-videos", s.guard(true, s.handleListShowcaseVideo))
+		mux.Handle("GET /api/v1/projects/{id}/showcase-videos/{jobId}/contract", s.guard(true, s.handleGetShowcaseVideoContract))
 		mux.Handle("POST /api/v1/projects/{id}/showcase-videos/{jobId}/confirm", s.guard(true, s.handleConfirmShowcaseVideo))
 		mux.Handle("POST /api/v1/projects/{id}/showcase-videos/{jobId}/submit", s.guard(true, s.handleSubmitShowcaseVideo))
 		mux.Handle("POST /api/v1/projects/{id}/showcase-videos/{jobId}/refresh", s.guard(true, s.handleRefreshShowcaseVideo))
