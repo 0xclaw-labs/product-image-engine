@@ -21,12 +21,13 @@ function render(): string {
 }
 
 describe("登录页(统一组件后的结构契约)", () => {
-  it("密码单式:无登录方式分段,唯一表单是账号密码,提交按钮文案为「登录」", () => {
+  it("密码单式:无登录方式分段,唯一表单是邮箱密码,提交按钮文案为「登录」", () => {
     const html = render();
     expect(html).not.toContain("登录方式"); // Segmented 分段控件不渲染(modes 固定)
     expect(html).not.toContain("发送验证码");
     expect((html.match(/<form[\s>]/g) ?? []).length).toBe(1);
-    expect(html).toContain("用户名");
+    expect(html).toMatch(/<label[^>]*>邮箱<\/label>/);
+    expect(html).not.toMatch(/<label[^>]*>用户名<\/label>/);
     expect(html).toContain("密码");
     expect(html).toContain("登录");
   });
@@ -57,10 +58,11 @@ describe("登录页(统一组件后的结构契约)", () => {
     }
   });
 
-  it("统一卡品牌头:h1「产品图」+ 封闭注册 tagline(本应用真实口径)", () => {
+  it("统一卡品牌头:h1「产品图」+ 封闭注册与邮箱密码/重置密码指引 tagline", () => {
     const html = render();
     expect(html).toContain("产品图");
     expect(html).toContain("账号由主管理员开通，不能自助注册。");
+    expect(html).toContain("使用平台账号邮箱和密码登录；若尚未设置密码，可前往 auth.modelxing.com 账号中心重置密码。");
   });
 
   it("产品声音保留:左台主视觉、五步真实流程、不生成图片声明、身份派生声明", () => {

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"math"
 	"net"
 	"net/http"
 	"net/url"
@@ -24,6 +25,7 @@ type Live struct {
 	TaskBase     string
 	Enabled      bool
 	HTTP         *http.Client
+	Now          func() time.Time
 }
 
 func (p *Live) Quote(ctx context.Context, in QuoteCall) (QuoteFact, error) {
@@ -52,7 +54,7 @@ func (p *Live) Quote(ctx context.Context, in QuoteCall) (QuoteFact, error) {
 	fact.Sent = true
 	fact.Currency = "CNY"
 	fact.FundsState = FundsNotSent
-	p.attachBalance(ctx, in.TenantID, in.PayerAccountID, &fact)
+	p.attachBalance(ctx, in.TenantID, in.PayerAccountID, in.Capability, &fact)
 	return fact, nil
 }
 
@@ -121,11 +123,16 @@ func (p *Live) ReadBalance(ctx context.Context, accountID string) (Balance, erro
 
 // ReadBalanceFor 只读指定租户名下的账号。租户不匹配时余额未知，不返回别的租户的数字。
 func (p *Live) ReadBalanceFor(ctx context.Context, tenantID, accountID string) (Balance, error) {
+	return p.ReadBalanceForCapability(ctx, tenantID, accountID, "")
+}
+
+// ReadBalanceForCapability 读取指定租户、账号在特定能力下可用的现金 + 定向额度余额。
+func (p *Live) ReadBalanceForCapability(ctx context.Context, tenantID, accountID, capability string) (Balance, error) {
 	if err := p.billingReady(); err != nil {
 		return Balance{Connection: ConnMissing}, err
 	}
 	var fact QuoteFact
-	p.attachBalance(ctx, tenantID, accountID, &fact)
+	p.attachBalance(ctx, tenantID, accountID, capability, &fact)
 	if !fact.BalanceKnown {
 		return Balance{Known: false, Connection: ConnReady}, nil
 	}
@@ -204,7 +211,7 @@ func (p *Live) quoteUsage(ctx context.Context, usageID string) (QuoteFact, error
 	return QuoteFact{AmountMinor: doc.Quote.AmountMinor, Currency: "CNY", Origin: strings.TrimSpace(doc.Quote.Origin)}, nil
 }
 
-func (p *Live) attachBalance(ctx context.Context, tenantID, accountID string, fact *QuoteFact) {
+func (p *Live) attachBalance(ctx context.Context, tenantID, accountID, capability string, fact *QuoteFact) {
 	query := url.Values{}
 	query.Set("account_id", accountID)
 	if strings.TrimSpace(tenantID) != "" {
@@ -218,18 +225,54 @@ func (p *Live) attachBalance(ctx context.Context, tenantID, accountID string, fa
 	if json.Unmarshal(body, &root) != nil {
 		return
 	}
+	var okFlag bool
+	if json.Unmarshal(root["ok"], &okFlag) != nil || !okFlag {
+		return
+	}
 	var snap map[string]json.RawMessage
 	if json.Unmarshal(root["snapshot"], &snap) != nil {
 		return
 	}
 	var account struct {
-		Cash int64 `json:"cash_balance_minor"`
+		AccountID          string `json:"account_id"`
+		Status             string `json:"status"`
+		CashAvailableMinor *int64 `json:"cash_available_minor"`
+		CashBalanceMinor   *int64 `json:"cash_balance_minor"`
 	}
 	if json.Unmarshal(snap["account"], &account) != nil {
 		return
 	}
+	reqAccountID := strings.TrimSpace(accountID)
+	snapAccountID := strings.TrimSpace(account.AccountID)
+	if reqAccountID != "" && snapAccountID != "" && snapAccountID != reqAccountID {
+		return
+	}
+	snapStatus := strings.TrimSpace(account.Status)
+	if snapStatus != "" && snapStatus != "active" {
+		return
+	}
+	var cashMinor int64
+	switch {
+	case account.CashAvailableMinor != nil:
+		cashMinor = *account.CashAvailableMinor
+	case account.CashBalanceMinor != nil:
+		cashMinor = *account.CashBalanceMinor
+	default:
+		return
+	}
+	if cashMinor < 0 {
+		return
+	}
+	appID := strings.TrimSpace(p.AppID)
+	targetCapability := strings.TrimSpace(capability)
+	nowUnix := p.now().Unix()
+	scopedMinor, ok := availableScopedCredits(snap["scoped_credits"], appID, targetCapability, nowUnix)
+	if !ok || scopedMinor > math.MaxInt64-cashMinor {
+		return
+	}
+
 	fact.BalanceKnown = true
-	fact.BalanceMinor = account.Cash
+	fact.BalanceMinor = cashMinor + scopedMinor
 	if !fact.IncludedAllowance && fact.BalanceMinor < fact.AmountMinor {
 		fact.FundsShort = true
 	}
@@ -237,23 +280,103 @@ func (p *Live) attachBalance(ctx context.Context, tenantID, accountID string, fa
 	if !ok {
 		return
 	}
-	var rows []struct {
-		Capability string `json:"capability"`
-		Status     string `json:"status"`
+	trimmedEnt := bytes.TrimSpace(raw)
+	if len(trimmedEnt) == 0 || bytes.Equal(trimmedEnt, []byte("null")) {
+		return
 	}
-	if json.Unmarshal(raw, &rows) != nil {
+	var rows []struct {
+		AppID          string `json:"app_id"`
+		Capability     string `json:"capability"`
+		Status         string `json:"status"`
+		ValidFromUnix  int64  `json:"valid_from_unix"`
+		ValidUntilUnix int64  `json:"valid_until_unix"`
+	}
+	if json.Unmarshal(trimmedEnt, &rows) != nil {
 		return
 	}
 	fact.EntitlementsKnown = true
+	seen := make(map[string]struct{}, len(rows))
 	for _, row := range rows {
-		if row.Capability == "" {
+		capName := strings.TrimSpace(row.Capability)
+		if capName == "" {
 			continue
 		}
-		if row.Status != "" && row.Status != "active" {
+		if strings.TrimSpace(row.AppID) != appID {
 			continue
 		}
-		fact.Entitlements = append(fact.Entitlements, row.Capability)
+		if strings.TrimSpace(row.Status) != "active" {
+			continue
+		}
+		if row.ValidFromUnix > nowUnix {
+			continue
+		}
+		if row.ValidUntilUnix < 0 || (row.ValidUntilUnix != 0 && row.ValidUntilUnix < nowUnix) {
+			continue
+		}
+		if _, dup := seen[capName]; dup {
+			continue
+		}
+		seen[capName] = struct{}{}
+		fact.Entitlements = append(fact.Entitlements, capName)
 	}
+}
+
+func availableScopedCredits(raw json.RawMessage, appID, targetCapability string, nowUnix int64) (int64, bool) {
+	trimmed := bytes.TrimSpace(raw)
+	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) {
+		return 0, true
+	}
+	var rows []struct {
+		AppID          string `json:"app_id"`
+		Capability     string `json:"capability"`
+		Status         string `json:"status"`
+		AvailableMinor *int64 `json:"available_minor"`
+		RemainingMinor *int64 `json:"remaining_minor"`
+		ExpiresAtUnix  int64  `json:"expires_at_unix"`
+	}
+	if json.Unmarshal(trimmed, &rows) != nil {
+		return 0, false
+	}
+	var total int64
+	for _, row := range rows {
+		if strings.TrimSpace(row.AppID) != appID {
+			continue
+		}
+		if strings.TrimSpace(row.Status) != "active" {
+			continue
+		}
+		if row.ExpiresAtUnix < 0 || (row.ExpiresAtUnix != 0 && row.ExpiresAtUnix < nowUnix) {
+			continue
+		}
+		creditCap := strings.TrimSpace(row.Capability)
+		if targetCapability != "" && creditCap != "" && creditCap != targetCapability {
+			continue
+		}
+		var minor int64
+		switch {
+		case row.AvailableMinor != nil:
+			minor = *row.AvailableMinor
+		case row.RemainingMinor != nil:
+			minor = *row.RemainingMinor
+		default:
+			continue
+		}
+		if minor < 0 {
+			return 0, false
+		}
+		if minor > math.MaxInt64-total {
+			return 0, false
+		}
+		total += minor
+	}
+	return total, true
+}
+
+func (p *Live) now() time.Time {
+	if p != nil && p.Now != nil {
+		return p.Now()
+	}
+	return time.Now()
 }
 
 func (p *Live) postBilling(ctx context.Context, path string, payload any) (int, []byte, error) {
